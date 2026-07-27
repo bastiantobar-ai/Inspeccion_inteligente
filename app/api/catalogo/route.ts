@@ -3,8 +3,6 @@ import { getSupabaseServer } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
-// Devuelve valores distintos para poblar los combos en cascada:
-// marca -> modelo -> version -> anio
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const marca = searchParams.get("marca");
@@ -18,15 +16,14 @@ export async function GET(req: NextRequest) {
   else field = "anio";
 
   const supabase = getSupabaseServer();
-  let query = supabase.from("catalogo").select(field);
+  const { data, error } = await supabase.rpc("opciones_catalogo", {
+    p_marca: marca,
+    p_modelo: modelo,
+    p_version: version,
+  });
 
-  if (marca) query = query.eq("marca", marca);
-  if (modelo) query = query.eq("modelo", modelo);
-  if (version) query = query.eq("version", version);
-
-  const { data, error } = await query.limit(50000);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const valores = Array.from(new Set((data ?? []).map((r: any) => r[field]))).sort();
+  const valores = (data ?? []).map((r: any) => r.valor);
   return NextResponse.json({ field, valores });
 }
