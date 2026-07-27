@@ -33,13 +33,12 @@ export async function POST(req: NextRequest) {
 
   const supabase = getSupabaseServer();
   const fullAuxSku = normaliza(`${marca}-${modelo}-${version}-${anio}`);
-  const anioStr = String(anio);
 
   const [{ data: insp }, { data: topOtsRpc, error: errOts }, { data: cangrejosCount, error: errCangrejos }, { data: devs }, { data: alertas }] =
     await Promise.all([
       supabase.from("insp_dif").select("*").eq("aux_sku", fullAuxSku).maybeSingle(),
-      supabase.rpc("top_ots_grupo", { p_marca: marca, p_modelo: modelo, p_anio: anioStr }),
-      supabase.rpc("contar_cangrejos_grupo", { p_marca: marca, p_modelo: modelo, p_anio: anioStr }),
+      supabase.rpc("top_ots_grupo", { p_marca: marca, p_modelo: modelo }),
+      supabase.rpc("contar_cangrejos_grupo", { p_marca: marca, p_modelo: modelo }),
       supabase.from("devoluciones").select("descripcion, aux_sku").eq("aux_sku", fullAuxSku),
       supabase.from("alertas_motor").select("*"),
     ]);
