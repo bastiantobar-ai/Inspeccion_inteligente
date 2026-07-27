@@ -7,8 +7,9 @@ type Opciones = { marca: string[]; modelo: string[]; version: string[]; anio: st
 async function fetchOpciones(params: Record<string, string>) {
   const qs = new URLSearchParams(params).toString();
   const res = await fetch(`/api/catalogo?${qs}`);
-  const { valores } = await res.json();
-  return valores as string[];
+  const json = await res.json();
+  if (!res.ok || json.error) throw new Error(json.error || "Error cargando opciones");
+  return (json.valores ?? []) as string[];
 }
 
 export default function Home() {
