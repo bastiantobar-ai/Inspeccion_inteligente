@@ -8,18 +8,19 @@ export async function GET(req: NextRequest) {
   const marca = searchParams.get("marca");
   const modelo = searchParams.get("modelo");
   const version = searchParams.get("version");
+  const skipVersion = searchParams.get("skipVersion") === "true";
 
   let field: "marca" | "modelo" | "version" | "anio";
   if (!marca) field = "marca";
   else if (!modelo) field = "modelo";
-  else if (!version) field = "version";
+  else if (!skipVersion && !version) field = "version";
   else field = "anio";
 
   const supabase = getSupabaseServer();
   const { data, error } = await supabase.rpc("opciones_catalogo", {
     p_marca: marca,
     p_modelo: modelo,
-    p_version: version,
+    p_version: skipVersion ? null : version,
   });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
