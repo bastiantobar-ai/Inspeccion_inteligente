@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
       devoluciones: devs.length,
       cangrejos: cangrejosDelGrupo,
       ots: topOts.length,
-      otsListado: topOts.map((o) => o.item),
+      otsListado: topOts.map((o: { item: string; count: number }) => o.item),
     },
     items,
     devoluciones: devs.map((d) => d.descripcion),
