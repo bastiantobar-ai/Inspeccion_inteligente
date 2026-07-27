@@ -1,11 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase";
+
 export const dynamic = "force-dynamic";
-// Motores de alerta cuya presencia en la versión dispara el link de ALERTAS.
-// Se matchea por substring sobre marca+modelo+version (no hay columna "motor" migrada).
+
 function normaliza(s: string) {
   return (s || "").toUpperCase().trim();
 }
+
+type Tag = "motor" | "transmision" | "electronicos" | "suspension" | "carroceria";
+
+function categorizar(workItemName: string): Tag {
+  const n = normaliza(workItemName);
+  if (n.includes("CAMBIO") || n.includes("TRANSMISION") || n.includes("CAJA") || n.includes("CREMALLERA")) return "transmision";
+  if (n.includes("ELECTR") || n.includes("OBD") || n.includes("SENSOR") || n.includes("CHECK ENGINE") || n.includes("TESTIGO")) return "electronicos";
+  if (n.includes("SUSPENSION") || n.includes("AMORTIGUADOR")) return "suspension";
+  if (n.includes("CARROCERIA") || n.includes("PINTURA") || n.includes("CHOQUE") || n.includes("PARAGOLPE")) return "carroceria";
+  return "motor";
+}
+
+type Item = { titulo: string; tag: Tag; criticidad: number };
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -48,7 +61,7 @@ export async function POST(req: NextRequest) {
     .slice(0, 10)
     .map(([item, count]) => ({ item, count }));
 
-  // Probabilidad de cangrejo: proporción de cangrejos del grupo + boost por antigüedad
+  // Probabilidad de cangrejo: cantidad del grupo Marca-Modelo-Año
   let cangrejosDelGrupo = 0;
   for (const c of cangrejosGrupo ?? []) {
     const auxParts = normaliza(c.aux_sku).split("-");
@@ -70,10 +83,35 @@ export async function POST(req: NextRequest) {
     else cqi = "E";
   }
 
-  // Alerta de motor: matchea el nombre del motor contra la versión del vehículo
   const alertaMotor = (alertas ?? []).find((a: any) =>
     normaliza(version).includes(normaliza(a.motor))
   );
+
+  // ── Armado del checklist ──
+  const items: Item[] = [];
+
+  if (cangrejosDelGrupo > 0) {
+    items.push({
+      titulo: "CANGREJO - Vehículo NO se pudo vender en Kavak - Diagnóstico motor general",
+      tag: "motor",
+      criticidad: 5,
+    });
+  }
+  if (topOts[0] && categorizar(topOts[0].item) === "motor") {
+    items.push({ titulo: "DIAGNÓSTICO DEL MOTOR - Problema frecuente en este modelo", tag: "motor", criticidad: 5 });
+  }
+  for (const ot of topOts) {
+    const tag = categorizar(ot.item);
+    const sufijo = tag === "electronicos" ? " - OBD2/sensores" : tag === "motor" ? " - Diagnóstico motor general" : "";
+    items.push({ titulo: `${ot.item} - Problema frecuente en este modelo${sufijo}`, tag, criticidad: 4 });
+  }
+
+  const modeloAnio = `${marca} ${modelo} ${anio}`;
+  items.push({ titulo: `Fallas en sistema de transmisión - ${modeloAnio}`, tag: "transmision", criticidad: 4 });
+  items.push({ titulo: `Problemas generales de motor - ${modeloAnio}`, tag: "motor", criticidad: 3 });
+  items.push({ titulo: `Problemas de carrocería - ${modeloAnio} - Diagnóstico motor general`, tag: "motor", criticidad: 3 });
+  items.push({ titulo: `Fallas en sistemas eléctricos - ${modeloAnio} - OBD2/sensores`, tag: "electronicos", criticidad: 3 });
+  items.push({ titulo: `Problemas de suspensión - ${modeloAnio}`, tag: "suspension", criticidad: 3 });
 
   return NextResponse.json({
     auxSku: fullAuxSku,
@@ -81,9 +119,15 @@ export async function POST(req: NextRequest) {
     inspeccionDiferenciada: insp
       ? { umbralKm: insp.kms_inspe_plus, link: insp.link, superaUmbral: km != null ? km >= insp.kms_inspe_plus : null }
       : null,
-    topOts,
-    cangrejo: { cantidadEnGrupo: cangrejosDelGrupo, antiguedadRiesgo: boostAntiguedad },
+    stats: {
+      devoluciones: (devs ?? []).length,
+      cangrejos: cangrejosDelGrupo,
+      ots: topOts.length,
+      otsListado: topOts.map((o) => o.item),
+    },
+    items,
     devoluciones: (devs ?? []).map((d: any) => d.descripcion),
+    cangrejo: { cantidadEnGrupo: cangrejosDelGrupo, antiguedadRiesgo: boostAntiguedad },
     alertaMotor: alertaMotor ? { motor: alertaMotor.motor, link: alertaMotor.link } : null,
     email: email ?? null,
   });
