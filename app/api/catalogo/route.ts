@@ -21,6 +21,7 @@ export async function GET(req: NextRequest) {
     p_marca: marca,
     p_modelo: modelo,
     p_version: skipVersion ? null : version,
+    p_skip_version: skipVersion,
   });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
