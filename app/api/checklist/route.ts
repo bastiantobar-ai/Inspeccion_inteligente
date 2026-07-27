@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase";
-
+export const dynamic = "force-dynamic";
 // Motores de alerta cuya presencia en la versión dispara el link de ALERTAS.
 // Se matchea por substring sobre marca+modelo+version (no hay columna "motor" migrada).
 function normaliza(s: string) {
