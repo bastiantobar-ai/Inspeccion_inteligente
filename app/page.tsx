@@ -64,7 +64,13 @@ export default function Home() {
     } catch (e: any) { setError(e.message); }
   }
 
-  async function onOmitirVersion() {
+  async function onToggleSinVersion() {
+    if (sinVersion) {
+      setSinVersion(false);
+      setAnio("");
+      setOpciones((o) => ({ ...o, anio: [] }));
+      return;
+    }
     setVersion(""); setAnio(""); setSinVersion(true);
     try {
       const valores = await fetchOpciones({ marca, modelo, skipVersion: "true" });
@@ -132,9 +138,9 @@ export default function Home() {
             {opciones.version.map((v) => <option key={v} value={v}>{v}</option>)}
           </select>
           {modelo && !version && (
-            <button type="button" onClick={onOmitirVersion}
+            <button type="button" onClick={onToggleSinVersion}
               className={`text-xs mt-1 underline ${sinVersion ? "text-black font-medium" : "text-gray-500"}`}>
-              {sinVersion ? "✓ Continuando sin versión específica" : "No tengo la versión, continuar sin ella"}
+              {sinVersion ? "✓ Sin versión específica (click para elegir una)" : "No tengo la versión, continuar sin ella"}
             </button>
           )}
         </div>
