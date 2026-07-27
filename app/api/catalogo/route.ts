@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase";
 
+export const dynamic = "force-dynamic";
+
 // Devuelve valores distintos para poblar los combos en cascada:
 // marca -> modelo -> version -> anio
 export async function GET(req: NextRequest) {
