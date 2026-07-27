@@ -20,6 +20,7 @@ export default function Home() {
   const [km, setKm] = useState("");
   const [email, setEmail] = useState("");
   const [opciones, setOpciones] = useState<Opciones>({ marca: [], modelo: [], version: [], anio: [] });
+  const [sinVersion, setSinVersion] = useState(false);
   const [resultado, setResultado] = useState<any>(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,7 +36,7 @@ export default function Home() {
 
   async function onChangeMarca(v: string) {
     setMarca(v);
-    setModelo(""); setVersion(""); setAnio("");
+    setModelo(""); setVersion(""); setAnio(""); setSinVersion(false);
     try {
       const valores = await fetchOpciones({ marca: v });
       setOpciones((o) => ({ ...o, modelo: valores, version: [], anio: [] }));
@@ -45,7 +46,7 @@ export default function Home() {
 
   async function onChangeModelo(v: string) {
     setModelo(v);
-    setVersion(""); setAnio("");
+    setVersion(""); setAnio(""); setSinVersion(false);
     try {
       const valores = await fetchOpciones({ marca, modelo: v });
       setOpciones((o) => ({ ...o, version: valores, anio: [] }));
@@ -55,9 +56,18 @@ export default function Home() {
 
   async function onChangeVersion(v: string) {
     setVersion(v);
-    setAnio("");
+    setAnio(""); setSinVersion(false);
     try {
       const valores = await fetchOpciones({ marca, modelo, version: v });
+      setOpciones((o) => ({ ...o, anio: valores }));
+      setError(null);
+    } catch (e: any) { setError(e.message); }
+  }
+
+  async function onOmitirVersion() {
+    setVersion(""); setAnio(""); setSinVersion(true);
+    try {
+      const valores = await fetchOpciones({ marca, modelo, skipVersion: "true" });
       setOpciones((o) => ({ ...o, anio: valores }));
       setError(null);
     } catch (e: any) { setError(e.message); }
@@ -71,7 +81,7 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          marca, modelo, version, anio: Number(anio),
+          marca, modelo, version: sinVersion ? undefined : version, anio: Number(anio),
           km: km ? Number(km) : undefined,
           email: email || undefined,
         }),
@@ -115,17 +125,23 @@ export default function Home() {
         </div>
 
         <div>
-          <label className="block text-sm mb-1">Versión</label>
-          <select className="border rounded w-full p-2" value={version} disabled={!modelo}
+          <label className="block text-sm mb-1">Versión (opcional)</label>
+          <select className="border rounded w-full p-2" value={version} disabled={!modelo || sinVersion}
             onChange={(e) => onChangeVersion(e.target.value)}>
             <option value="">Selecciona...</option>
             {opciones.version.map((v) => <option key={v} value={v}>{v}</option>)}
           </select>
+          {modelo && !version && (
+            <button type="button" onClick={onOmitirVersion}
+              className={`text-xs mt-1 underline ${sinVersion ? "text-black font-medium" : "text-gray-500"}`}>
+              {sinVersion ? "✓ Continuando sin versión específica" : "No tengo la versión, continuar sin ella"}
+            </button>
+          )}
         </div>
 
         <div>
           <label className="block text-sm mb-1">Año</label>
-          <select className="border rounded w-full p-2" value={anio} disabled={!version}
+          <select className="border rounded w-full p-2" value={anio} disabled={!version && !sinVersion}
             onChange={(e) => setAnio(e.target.value)}>
             <option value="">Selecciona...</option>
             {opciones.anio.map((v) => <option key={v} value={v}>{v}</option>)}
