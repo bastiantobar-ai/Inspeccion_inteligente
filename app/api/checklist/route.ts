@@ -33,46 +33,24 @@ export async function POST(req: NextRequest) {
 
   const supabase = getSupabaseServer();
   const fullAuxSku = normaliza(`${marca}-${modelo}-${version}-${anio}`);
-  const groupKey = normaliza(`${marca}-${modelo}-${anio}`); // Marca-Modelo-Año, sin versión
+  const anioStr = String(anio);
 
-  const [{ data: insp }, { data: ots }, { data: cangrejosGrupo }, { data: devs }, { data: alertas }] =
+  const [{ data: insp }, { data: topOtsRpc, error: errOts }, { data: cangrejosCount, error: errCangrejos }, { data: devs }, { data: alertas }] =
     await Promise.all([
       supabase.from("insp_dif").select("*").eq("aux_sku", fullAuxSku).maybeSingle(),
-      supabase.from("ots").select("work_item_name, aux_sku"),
-      supabase.from("cangrejos").select("aux_sku"),
+      supabase.rpc("top_ots_grupo", { p_marca: marca, p_modelo: modelo, p_anio: anioStr }),
+      supabase.rpc("contar_cangrejos_grupo", { p_marca: marca, p_modelo: modelo, p_anio: anioStr }),
       supabase.from("devoluciones").select("descripcion, aux_sku").eq("aux_sku", fullAuxSku),
       supabase.from("alertas_motor").select("*"),
     ]);
 
-  // TOP work items con más de 3 OTs, agrupado por Marca-Modelo-Año
-  // (aux_sku de OTs incluye versión, así que agrupamos ignorándola)
-  const conteoOts = new Map<string, number>();
-  for (const o of ots ?? []) {
-    const auxParts = normaliza(o.aux_sku).split("-");
-    const anioOt = auxParts[auxParts.length - 1];
-    const marcaOt = auxParts[0];
-    const modeloOt = auxParts[1];
-    if (`${marcaOt}-${modeloOt}-${anioOt}` !== groupKey) continue;
-    conteoOts.set(o.work_item_name, (conteoOts.get(o.work_item_name) ?? 0) + 1);
-  }
-  const topOts = Array.from(conteoOts.entries())
-    .filter(([, c]) => c > 3)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10)
-    .map(([item, count]) => ({ item, count }));
+  if (errOts) return NextResponse.json({ error: errOts.message }, { status: 500 });
+  if (errCangrejos) return NextResponse.json({ error: errCangrejos.message }, { status: 500 });
 
-  // Probabilidad de cangrejo: cantidad del grupo Marca-Modelo-Año
-  let cangrejosDelGrupo = 0;
-  for (const c of cangrejosGrupo ?? []) {
-    const auxParts = normaliza(c.aux_sku).split("-");
-    const anioC = auxParts[auxParts.length - 1];
-    const marcaC = auxParts[0];
-    const modeloC = auxParts[1];
-    if (`${marcaC}-${modeloC}-${anioC}` === groupKey) cangrejosDelGrupo++;
-  }
+  const topOts = (topOtsRpc ?? []).map((r: any) => ({ item: r.work_item_name, count: r.cantidad }));
+  const cangrejosDelGrupo = cangrejosCount ?? 0;
   const boostAntiguedad = anio < 2016;
 
-  // CQI (Marca-Año-Km) — clasificación A-E por kilometraje relativo al umbral de insp_dif
   let cqi: "A" | "B" | "C" | "D" | "E" = "E";
   if (km != null && insp?.kms_inspe_plus) {
     const ratio = km / insp.kms_inspe_plus;
@@ -87,7 +65,6 @@ export async function POST(req: NextRequest) {
     normaliza(version).includes(normaliza(a.motor))
   );
 
-  // ── Armado del checklist ──
   const items: Item[] = [];
 
   if (cangrejosDelGrupo > 0) {
