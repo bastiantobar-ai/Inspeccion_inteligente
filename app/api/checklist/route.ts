@@ -23,28 +23,42 @@ type Item = { titulo: string; tag: Tag; criticidad: number };
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const { marca, modelo, version, anio, km, email } = body as {
-    marca: string; modelo: string; version: string; anio: number;
+    marca: string; modelo: string; version?: string; anio: number;
     km?: number; email?: string;
   };
 
-  if (!marca || !modelo || !version || !anio) {
-    return NextResponse.json({ error: "Faltan marca/modelo/version/año" }, { status: 400 });
+  if (!marca || !modelo || !anio) {
+    return NextResponse.json({ error: "Faltan marca/modelo/año" }, { status: 400 });
   }
 
   const supabase = getSupabaseServer();
-  const fullAuxSku = normaliza(`${marca}-${modelo}-${version}-${anio}`);
+  const tieneVersion = !!version;
+  const fullAuxSku = tieneVersion ? normaliza(`${marca}-${modelo}-${version}-${anio}`) : null;
+  const anioStr = String(anio);
 
-  const [{ data: insp }, { data: topOtsRpc, error: errOts }, { data: cangrejosCount, error: errCangrejos }, { data: devs }, { data: alertas }] =
-    await Promise.all([
-      supabase.from("insp_dif").select("*").eq("aux_sku", fullAuxSku).maybeSingle(),
-      supabase.rpc("top_ots_grupo", { p_marca: marca, p_modelo: modelo }),
-      supabase.rpc("contar_cangrejos_grupo", { p_marca: marca, p_modelo: modelo }),
-      supabase.from("devoluciones").select("descripcion, aux_sku").eq("aux_sku", fullAuxSku),
-      supabase.from("alertas_motor").select("*"),
-    ]);
+  const [
+    inspResult,
+    { data: topOtsRpc, error: errOts },
+    { data: cangrejosCount, error: errCangrejos },
+    devsResult,
+    { data: alertas },
+  ] = await Promise.all([
+    tieneVersion
+      ? supabase.from("insp_dif").select("kms_inspe_plus, link").eq("aux_sku", fullAuxSku).maybeSingle()
+      : supabase.rpc("insp_dif_grupo", { p_marca: marca, p_modelo: modelo, p_anio: anioStr }).maybeSingle(),
+    supabase.rpc("top_ots_grupo", { p_marca: marca, p_modelo: modelo }),
+    supabase.rpc("contar_cangrejos_grupo", { p_marca: marca, p_modelo: modelo }),
+    tieneVersion
+      ? supabase.from("devoluciones").select("descripcion").eq("aux_sku", fullAuxSku)
+      : supabase.rpc("devoluciones_grupo", { p_marca: marca, p_modelo: modelo, p_anio: anioStr }),
+    supabase.from("alertas_motor").select("*"),
+  ]);
 
   if (errOts) return NextResponse.json({ error: errOts.message }, { status: 500 });
   if (errCangrejos) return NextResponse.json({ error: errCangrejos.message }, { status: 500 });
+
+  const insp = inspResult.data as { kms_inspe_plus: number; link: string } | null;
+  const devs = (devsResult.data ?? []) as { descripcion: string }[];
 
   const topOts = (topOtsRpc ?? []).map((r: any) => ({ item: r.work_item_name, count: r.cantidad }));
   const cangrejosDelGrupo = cangrejosCount ?? 0;
@@ -60,9 +74,9 @@ export async function POST(req: NextRequest) {
     else cqi = "E";
   }
 
-  const alertaMotor = (alertas ?? []).find((a: any) =>
-    normaliza(version).includes(normaliza(a.motor))
-  );
+  const alertaMotor = version
+    ? (alertas ?? []).find((a: any) => normaliza(version).includes(normaliza(a.motor)))
+    : undefined;
 
   const items: Item[] = [];
 
@@ -90,19 +104,19 @@ export async function POST(req: NextRequest) {
   items.push({ titulo: `Problemas de suspensión - ${modeloAnio}`, tag: "suspension", criticidad: 3 });
 
   return NextResponse.json({
-    auxSku: fullAuxSku,
+    auxSku: fullAuxSku ?? `${normaliza(marca)}-${normaliza(modelo)}-${anio}`,
     cqi,
     inspeccionDiferenciada: insp
       ? { umbralKm: insp.kms_inspe_plus, link: insp.link, superaUmbral: km != null ? km >= insp.kms_inspe_plus : null }
       : null,
     stats: {
-      devoluciones: (devs ?? []).length,
+      devoluciones: devs.length,
       cangrejos: cangrejosDelGrupo,
       ots: topOts.length,
       otsListado: topOts.map((o) => o.item),
     },
     items,
-    devoluciones: (devs ?? []).map((d: any) => d.descripcion),
+    devoluciones: devs.map((d) => d.descripcion),
     cangrejo: { cantidadEnGrupo: cangrejosDelGrupo, antiguedadRiesgo: boostAntiguedad },
     alertaMotor: alertaMotor ? { motor: alertaMotor.motor, link: alertaMotor.link } : null,
     email: email ?? null,
