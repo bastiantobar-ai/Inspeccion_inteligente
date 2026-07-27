@@ -22,33 +22,45 @@ export default function Home() {
   const [opciones, setOpciones] = useState<Opciones>({ marca: [], modelo: [], version: [], anio: [] });
   const [resultado, setResultado] = useState<any>(null);
   const [cargando, setCargando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function onMarcaFocus() {
     if (opciones.marca.length) return;
-    setOpciones((o) => ({ ...o, marca: [] }));
-    const valores = await fetchOpciones({});
-    setOpciones((o) => ({ ...o, marca: valores }));
+    try {
+      const valores = await fetchOpciones({});
+      setOpciones((o) => ({ ...o, marca: valores }));
+      setError(null);
+    } catch (e: any) { setError(e.message); }
   }
 
   async function onChangeMarca(v: string) {
     setMarca(v);
     setModelo(""); setVersion(""); setAnio("");
-    const valores = await fetchOpciones({ marca: v });
-    setOpciones((o) => ({ ...o, modelo: valores, version: [], anio: [] }));
+    try {
+      const valores = await fetchOpciones({ marca: v });
+      setOpciones((o) => ({ ...o, modelo: valores, version: [], anio: [] }));
+      setError(null);
+    } catch (e: any) { setError(e.message); }
   }
 
   async function onChangeModelo(v: string) {
     setModelo(v);
     setVersion(""); setAnio("");
-    const valores = await fetchOpciones({ marca, modelo: v });
-    setOpciones((o) => ({ ...o, version: valores, anio: [] }));
+    try {
+      const valores = await fetchOpciones({ marca, modelo: v });
+      setOpciones((o) => ({ ...o, version: valores, anio: [] }));
+      setError(null);
+    } catch (e: any) { setError(e.message); }
   }
 
   async function onChangeVersion(v: string) {
     setVersion(v);
     setAnio("");
-    const valores = await fetchOpciones({ marca, modelo, version: v });
-    setOpciones((o) => ({ ...o, anio: valores }));
+    try {
+      const valores = await fetchOpciones({ marca, modelo, version: v });
+      setOpciones((o) => ({ ...o, anio: valores }));
+      setError(null);
+    } catch (e: any) { setError(e.message); }
   }
 
   async function generarChecklist() {
@@ -74,6 +86,12 @@ export default function Home() {
     <main className="max-w-2xl mx-auto p-8">
       <h1 className="text-2xl font-bold">Inspección Inteligente</h1>
       <p className="text-gray-500 mb-6">Sistema de generación de checklists con IA</p>
+
+      {error && (
+        <div className="border border-red-300 bg-red-50 text-red-800 rounded p-3 mb-4 text-sm">
+          {error}
+        </div>
+      )}
 
       <section className="border rounded-lg p-6 space-y-4">
         <h2 className="font-semibold">🔍 Búsqueda de Vehículo</h2>
