@@ -153,12 +153,58 @@ export default function Home() {
         </button>
       </section>
 
-      {resultado && (
-        <section className="border rounded-lg p-6 mt-6 space-y-3">
-          <h2 className="font-semibold">Resultado</h2>
-          <pre className="text-xs bg-gray-50 p-3 rounded overflow-auto">
-            {JSON.stringify(resultado, null, 2)}
-          </pre>
+      {resultado && resultado.error && (
+        <div className="border border-red-300 bg-red-50 text-red-800 rounded p-3 mt-4 text-sm">
+          {resultado.error}
+        </div>
+      )}
+
+      {resultado && !resultado.error && (
+        <section className="border rounded-lg p-6 mt-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold">📋 Checklist Generado</h2>
+            <span className="bg-gray-100 text-gray-700 text-xs rounded-full px-3 py-1">
+              {resultado.items.length} items
+            </span>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
+            <h3 className="text-sm font-semibold mb-3">📊 Datos históricos analizados:</h3>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-white rounded p-3 text-center">
+                <div className="text-red-600 font-bold">{resultado.stats.devoluciones} Devoluciones</div>
+              </div>
+              <div className="bg-white rounded p-3 text-center">
+                <div className="text-orange-600 font-bold">{resultado.stats.cangrejos} Cangrejos</div>
+              </div>
+              <div className="bg-white rounded p-3 text-center">
+                <div className="text-blue-600 font-bold mb-1">{resultado.stats.ots} Órdenes de Trabajo</div>
+                <ul className="text-xs text-gray-600 text-left list-disc list-inside">
+                  {resultado.stats.otsListado.map((o: string) => <li key={o}>{o}</li>)}
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {resultado.items.map((it: { titulo: string; tag: string; criticidad: number }, i: number) => (
+              <details key={i} className="border rounded-lg p-3">
+                <summary className="flex items-center justify-between cursor-pointer">
+                  <span className="font-medium text-sm">{it.titulo}</span>
+                  <span className="flex items-center gap-2 shrink-0 ml-3">
+                    <span className="bg-gray-100 text-gray-700 text-xs rounded-full px-2 py-0.5">{it.tag}</span>
+                    <span
+                      className={`text-white text-xs rounded-full px-2 py-0.5 ${
+                        it.criticidad >= 5 ? "bg-red-600" : it.criticidad >= 4 ? "bg-red-500" : "bg-gray-500"
+                      }`}
+                    >
+                      Criticidad {it.criticidad}
+                    </span>
+                  </span>
+                </summary>
+              </details>
+            ))}
+          </div>
         </section>
       )}
     </main>
