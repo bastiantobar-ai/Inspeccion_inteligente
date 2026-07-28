@@ -190,6 +190,79 @@ export default function Home() {
             </span>
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <div className="border rounded-lg p-4">
+              <div className="text-xs text-gray-500 mb-1">CQI · Marca-Año-KM</div>
+              <div className="flex items-baseline gap-2">
+                <span
+                  className={`text-3xl font-bold ${
+                    resultado.cqi.grado === "A" ? "text-green-600" :
+                    resultado.cqi.grado === "B" ? "text-lime-600" :
+                    resultado.cqi.grado === "C" ? "text-yellow-600" :
+                    resultado.cqi.grado === "D" ? "text-orange-600" : "text-red-600"
+                  }`}
+                >
+                  {resultado.cqi.grado}
+                </span>
+                <span className="text-xs text-gray-400">puntaje {resultado.cqi.puntaje}</span>
+              </div>
+              <div className="text-xs text-gray-500 mt-1 flex gap-2">
+                <span>Año {resultado.cqi.buckets.anio}</span>
+                <span>·</span>
+                <span>KM {resultado.cqi.buckets.km ?? "—"}</span>
+                <span>·</span>
+                <span>Marca {resultado.cqi.buckets.marca}</span>
+              </div>
+              {resultado.cqi.parcial && (
+                <div className="text-[10px] text-gray-400 mt-1">
+                  Sin KM: calculado con 2 factores
+                </div>
+              )}
+            </div>
+
+            <div className="border rounded-lg p-4">
+              <div className="text-xs text-gray-500 mb-1">Probabilidad de cangrejo</div>
+              <div className="flex items-baseline gap-2">
+                <span
+                  className={`text-3xl font-bold ${
+                    resultado.cangrejo.nivel === "MUY ALTA" ? "text-red-600" :
+                    resultado.cangrejo.nivel === "ALTA" ? "text-orange-600" :
+                    resultado.cangrejo.nivel === "MEDIA" ? "text-yellow-600" : "text-green-600"
+                  }`}
+                >
+                  {resultado.cangrejo.probabilidad != null ? `${resultado.cangrejo.probabilidad}%` : "—"}
+                </span>
+                <span className="text-xs font-medium text-gray-600">{resultado.cangrejo.nivel}</span>
+              </div>
+              {resultado.cangrejo.vecesBase != null && (
+                <div className="text-xs text-gray-500 mt-1">
+                  {resultado.cangrejo.vecesBase}x la tasa base ({resultado.cangrejo.tasaBase}%)
+                </div>
+              )}
+              {resultado.cangrejo.antiguedadRiesgo && (
+                <div className="text-xs text-orange-700 mt-1">⚠️ Año &lt; 2016</div>
+              )}
+            </div>
+          </div>
+
+          {resultado.cangrejo.detalle && (
+            <details className="border rounded-lg p-3 text-sm">
+              <summary className="cursor-pointer font-medium">¿De dónde sale ese porcentaje?</summary>
+              <div className="mt-2 text-xs text-gray-600 space-y-1">
+                <div>
+                  Marca: {resultado.cangrejo.detalle.marca.cangrejos} cangrejos en{" "}
+                  {resultado.cangrejo.detalle.marca.autos} autos → {resultado.cangrejo.detalle.marca.tasa}%
+                </div>
+                <div>
+                  Modelo: {resultado.cangrejo.detalle.modelo.cangrejos} cangrejos en{" "}
+                  {resultado.cangrejo.detalle.modelo.autos} autos → {resultado.cangrejo.detalle.modelo.tasa}%
+                  <span className="text-gray-400"> (ajustada hacia la marca si la muestra es chica)</span>
+                </div>
+                <div>Factor por año: ×{resultado.cangrejo.detalle.factorAnio}</div>
+              </div>
+            </details>
+          )}
+
           <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
             <h3 className="text-sm font-semibold mb-3">📊 Datos históricos analizados:</h3>
             <div className="grid grid-cols-3 gap-3">
@@ -201,9 +274,18 @@ export default function Home() {
               </div>
               <div className="bg-white rounded p-3 text-center">
                 <div className="text-blue-600 font-bold mb-1">{resultado.stats.ots} Órdenes de Trabajo</div>
+                <div className="text-[10px] text-gray-400 mb-1">con más de 3 OTs</div>
                 <ul className="text-xs text-gray-600 text-left list-disc list-inside">
                   {resultado.stats.otsListado.map((o: string) => <li key={o}>{o}</li>)}
                 </ul>
+                {resultado.stats.otsBajoUmbral?.length > 0 && (
+                  <div className="text-left mt-1">
+                    <div className="text-[10px] text-gray-400">Ninguna supera 3 OTs. Antecedentes puntuales:</div>
+                    <ul className="text-xs text-gray-500 list-disc list-inside">
+                      {resultado.stats.otsBajoUmbral.map((o: string) => <li key={o}>{o}</li>)}
+                    </ul>
+                  </div>
+                )}
               </div>
             </div>
           </div>
