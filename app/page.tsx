@@ -341,18 +341,18 @@ export default function Home() {
               </div>
               <div className="bg-white border border-gray-100 rounded-lg p-4">
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-600">{resultado.stats.totalTiposOts}</div>
-                  <div className="text-xs text-gray-500 mt-0.5">tipos de falla registrados</div>
+                  <div className="text-2xl font-bold text-blue-600">{resultado.stats.ots}</div>
+                  <div className="text-xs text-gray-500 mt-0.5">
+                    {resultado.stats.ots === 1 ? "problema recurrente" : "problemas recurrentes"}
+                  </div>
                   <div className="text-[11px] text-gray-400 mt-0.5">
-                    {resultado.stats.ots > 0
-                      ? `${resultado.stats.ots} con más de 3 OTs`
-                      : "ninguno supera 3 OTs"}
+                    con más de 3 OTs · de {resultado.stats.totalTiposOts} ítems en el historial
                   </div>
                 </div>
                 {resultado.stats.otsTop10?.length > 0 && (
                   <div className="mt-3 pt-3 border-t border-gray-100">
                     <div className="text-[11px] text-gray-400 mb-1">
-                      Top {resultado.stats.otsTop10.length} OTs con mayor frecuencia:
+                      Top {resultado.stats.otsTop10.length} por frecuencia:
                     </div>
                     <ul className="text-xs list-disc list-inside space-y-0.5">
                       {resultado.stats.otsTop10.map(
