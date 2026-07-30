@@ -4,6 +4,12 @@ import { useState } from "react";
 
 type Opciones = { marca: string[]; modelo: string[]; version: string[]; anio: string[] };
 
+const INPUT_CLASS =
+  "w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm shadow-sm transition " +
+  "focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 " +
+  "disabled:bg-gray-50 disabled:text-gray-400";
+const LABEL_CLASS = "block text-sm font-medium text-gray-700 mb-1.5";
+
 async function fetchOpciones(params: Record<string, string>) {
   const qs = new URLSearchParams(params).toString();
   const res = await fetch(`/api/catalogo?${qs}`);
@@ -99,103 +105,148 @@ export default function Home() {
   }
 
   return (
-    <main className="max-w-2xl mx-auto p-8">
-      <h1 className="text-2xl font-bold">Inspección Inteligente</h1>
-      <p className="text-gray-500 mb-6">Sistema de generación de checklists con IA</p>
+    <main className="max-w-5xl mx-auto px-4 py-10 sm:px-6">
+      <header className="text-center mb-8">
+        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Inspección Inteligente</h1>
+        <p className="text-gray-500 mt-1">Sistema de generación de checklists con IA</p>
+      </header>
 
       {error && (
-        <div className="border border-red-300 bg-red-50 text-red-800 rounded p-3 mb-4 text-sm">
+        <div className="border border-red-200 bg-red-50 text-red-800 rounded-xl p-3 mb-4 text-sm">
           {error}
         </div>
       )}
 
-      <section className="border rounded-lg p-6 space-y-4">
-        <h2 className="font-semibold">🔍 Búsqueda de Vehículo</h2>
+      <section className="bg-white border border-gray-100 rounded-2xl shadow-sm p-6 sm:p-8">
+        <h2 className="font-semibold text-lg mb-5">🔍 Búsqueda de Vehículo</h2>
 
-        <div>
-          <label className="block text-sm mb-1">Marca</label>
-          <select className="border rounded w-full p-2" value={marca} onFocus={onMarcaFocus}
-            onChange={(e) => onChangeMarca(e.target.value)}>
-            <option value="">Selecciona...</option>
-            {opciones.marca.map((v) => <option key={v} value={v}>{v}</option>)}
-          </select>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
+          <div>
+            <label className={LABEL_CLASS}>Marca</label>
+            <input list="lista-marca" className={INPUT_CLASS} value={marca} onFocus={onMarcaFocus}
+              onChange={(e) => onChangeMarca(e.target.value)} placeholder="Escribe o selecciona..." />
+            <datalist id="lista-marca">
+              {opciones.marca.map((v) => <option key={v} value={v} />)}
+            </datalist>
+          </div>
+
+          <div>
+            <label className={LABEL_CLASS}>Modelo</label>
+            <input list="lista-modelo" className={INPUT_CLASS} value={modelo} disabled={!marca}
+              onChange={(e) => onChangeModelo(e.target.value)} placeholder="Escribe o selecciona..." />
+            <datalist id="lista-modelo">
+              {opciones.modelo.map((v) => <option key={v} value={v} />)}
+            </datalist>
+          </div>
+
+          <div>
+            <label className={LABEL_CLASS}>Versión <span className="font-normal text-gray-400">(opcional)</span></label>
+            <input list="lista-version" className={INPUT_CLASS} value={version} disabled={!modelo || sinVersion}
+              onChange={(e) => onChangeVersion(e.target.value)} placeholder="Escribe o selecciona..." />
+            <datalist id="lista-version">
+              {opciones.version.map((v) => <option key={v} value={v} />)}
+            </datalist>
+            {modelo && !version && (
+              <button type="button" onClick={onToggleSinVersion}
+                className={`text-xs mt-1.5 underline ${sinVersion ? "text-blue-700 font-medium" : "text-gray-500 hover:text-gray-700"}`}>
+                {sinVersion ? "✓ Sin versión específica" : "No tengo la versión"}
+              </button>
+            )}
+          </div>
+
+          <div>
+            <label className={LABEL_CLASS}>Año</label>
+            <input list="lista-anio" className={INPUT_CLASS} value={anio} disabled={!version && !sinVersion}
+              onChange={(e) => setAnio(e.target.value)} placeholder="Escribe o selecciona..." />
+            <datalist id="lista-anio">
+              {opciones.anio.map((v) => <option key={v} value={v} />)}
+            </datalist>
+          </div>
         </div>
 
-        <div>
-          <label className="block text-sm mb-1">Modelo</label>
-          <select className="border rounded w-full p-2" value={modelo} disabled={!marca}
-            onChange={(e) => onChangeModelo(e.target.value)}>
-            <option value="">Selecciona...</option>
-            {opciones.modelo.map((v) => <option key={v} value={v}>{v}</option>)}
-          </select>
-        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-5">
+          <div>
+            <label className={LABEL_CLASS}>Kilometraje <span className="font-normal text-gray-400">(opcional)</span></label>
+            <input type="number" className={INPUT_CLASS} placeholder="Ej: 50000"
+              value={km} onChange={(e) => setKm(e.target.value)} />
+          </div>
 
-        <div>
-          <label className="block text-sm mb-1">Versión (opcional)</label>
-          <select className="border rounded w-full p-2" value={version} disabled={!modelo || sinVersion}
-            onChange={(e) => onChangeVersion(e.target.value)}>
-            <option value="">Selecciona...</option>
-            {opciones.version.map((v) => <option key={v} value={v}>{v}</option>)}
-          </select>
-          {modelo && !version && (
-            <button type="button" onClick={onToggleSinVersion}
-              className={`text-xs mt-1 underline ${sinVersion ? "text-black font-medium" : "text-gray-500"}`}>
-              {sinVersion ? "✓ Sin versión específica (click para elegir una)" : "No tengo la versión, continuar sin ella"}
-            </button>
-          )}
-        </div>
+          <div>
+            <label className={LABEL_CLASS}>Email <span className="font-normal text-gray-400">(opcional)</span></label>
+            <input type="email" className={INPUT_CLASS} placeholder="tu@email.com"
+              value={email} onChange={(e) => setEmail(e.target.value)} />
+          </div>
 
-        <div>
-          <label className="block text-sm mb-1">Año</label>
-          <select className="border rounded w-full p-2" value={anio} disabled={!version && !sinVersion}
-            onChange={(e) => setAnio(e.target.value)}>
-            <option value="">Selecciona...</option>
-            {opciones.anio.map((v) => <option key={v} value={v}>{v}</option>)}
-          </select>
+          <button
+            className="bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg px-4 py-2.5 text-sm shadow-sm transition disabled:opacity-40 disabled:hover:bg-blue-600"
+            disabled={!anio || cargando}
+            onClick={generarChecklist}
+          >
+            {cargando ? "Generando..." : "🚀 Generar Checklist"}
+          </button>
         </div>
-
-        <div>
-          <label className="block text-sm mb-1">Kilometraje (opcional)</label>
-          <input type="number" className="border rounded w-full p-2" placeholder="Ej: 50000"
-            value={km} onChange={(e) => setKm(e.target.value)} />
-        </div>
-
-        <div>
-          <label className="block text-sm mb-1">Email (opcional)</label>
-          <input type="email" className="border rounded w-full p-2" placeholder="tu@email.com"
-            value={email} onChange={(e) => setEmail(e.target.value)} />
-        </div>
-
-        <button
-          className="w-full bg-black text-white rounded p-2 disabled:opacity-40"
-          disabled={!anio || cargando}
-          onClick={generarChecklist}
-        >
-          {cargando ? "Generando..." : "🚀 Generar Checklist"}
-        </button>
       </section>
 
       {resultado && resultado.error && (
-        <div className="border border-red-300 bg-red-50 text-red-800 rounded p-3 mt-4 text-sm">
+        <div className="border border-red-200 bg-red-50 text-red-800 rounded-xl p-3 mt-6 text-sm">
           {resultado.error}
         </div>
       )}
 
       {resultado && !resultado.error && (
-        <section className="border rounded-lg p-6 mt-6 space-y-4">
+        <section className="bg-white border border-gray-100 rounded-2xl shadow-sm p-6 sm:p-8 mt-6 space-y-5">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold">📋 Checklist Generado</h2>
-            <span className="bg-gray-100 text-gray-700 text-xs rounded-full px-3 py-1">
+            <span className="bg-gray-100 text-gray-600 text-xs rounded-full px-3 py-1">
               {resultado.items.length} items
             </span>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="border rounded-lg p-4">
+          {resultado.inspeccionDiferenciada && (
+            <div
+              className={`border rounded-xl p-4 ${
+                resultado.inspeccionDiferenciada.superaUmbral === true
+                  ? "border-red-200 bg-red-50"
+                  : resultado.inspeccionDiferenciada.superaUmbral === false
+                  ? "border-gray-200 bg-gray-50"
+                  : "border-amber-200 bg-amber-50"
+              }`}
+            >
+              <div className="font-semibold text-sm">
+                {resultado.inspeccionDiferenciada.superaUmbral === true
+                  ? "⚠️ Requiere Inspección Diferenciada"
+                  : resultado.inspeccionDiferenciada.superaUmbral === false
+                  ? "ℹ️ Modelo con protocolo de Inspección Diferenciada"
+                  : "⚠️ Este modelo puede requerir Inspección Diferenciada"}
+              </div>
+              <div className="text-xs text-gray-600 mt-1">
+                Umbral: {resultado.inspeccionDiferenciada.umbralKm.toLocaleString("es-CL")} km
+                {resultado.inspeccionDiferenciada.superaUmbral === true &&
+                  " · el vehículo supera el umbral"}
+                {resultado.inspeccionDiferenciada.superaUmbral === false &&
+                  " · el vehículo ingresado no lo supera"}
+                {resultado.inspeccionDiferenciada.superaUmbral === null &&
+                  " · ingresa el kilometraje para confirmar si aplica"}
+              </div>
+              {resultado.inspeccionDiferenciada.link && (
+                <a
+                  href={resultado.inspeccionDiferenciada.link}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs underline text-blue-700 mt-1.5 inline-block"
+                >
+                  Ver protocolo
+                </a>
+              )}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="border border-gray-100 bg-gray-50/50 rounded-xl p-4">
               <div className="text-xs text-gray-500 mb-1">CQI · Marca-Año-KM</div>
               <div className="flex items-baseline gap-2">
                 <span
-                  className={`text-3xl font-bold ${
+                  className={`text-4xl font-bold ${
                     resultado.cqi.grado === "A" ? "text-green-600" :
                     resultado.cqi.grado === "B" ? "text-lime-600" :
                     resultado.cqi.grado === "C" ? "text-yellow-600" :
@@ -206,83 +257,115 @@ export default function Home() {
                 </span>
                 <span className="text-xs text-gray-400">puntaje {resultado.cqi.puntaje}</span>
               </div>
-              <div className="text-xs text-gray-500 mt-1 flex gap-2">
+              <div className="text-xs text-gray-500 mt-2 flex gap-2">
                 <span>Año {resultado.cqi.buckets.anio}</span>
-                <span>·</span>
+                <span className="text-gray-300">·</span>
                 <span>KM {resultado.cqi.buckets.km ?? "—"}</span>
-                <span>·</span>
+                <span className="text-gray-300">·</span>
                 <span>Marca {resultado.cqi.buckets.marca}</span>
               </div>
               {resultado.cqi.parcial && (
-                <div className="text-[10px] text-gray-400 mt-1">
+                <div className="text-[11px] text-gray-400 mt-1">
                   Sin KM: calculado con 2 factores
                 </div>
               )}
             </div>
 
-            <div className="border rounded-lg p-4">
-              <div className="text-xs text-gray-500 mb-1">Probabilidad de cangrejo</div>
+            <div className="border border-gray-100 bg-gray-50/50 rounded-xl p-4">
+              <div className="text-xs text-gray-500 mb-1">Riesgo de cangrejo</div>
               <div className="flex items-baseline gap-2">
                 <span
-                  className={`text-3xl font-bold ${
-                    resultado.cangrejo.nivel === "MUY ALTA" ? "text-red-600" :
-                    resultado.cangrejo.nivel === "ALTA" ? "text-orange-600" :
-                    resultado.cangrejo.nivel === "MEDIA" ? "text-yellow-600" : "text-green-600"
+                  className={`text-4xl font-bold ${
+                    resultado.cangrejo.nivel === "MUY PROBABLE" ? "text-red-600" :
+                    resultado.cangrejo.nivel === "PROBABLE" ? "text-orange-600" : "text-green-600"
                   }`}
                 >
-                  {resultado.cangrejo.probabilidad != null ? `${resultado.cangrejo.probabilidad}%` : "—"}
+                  {resultado.cangrejo.puntaje}
                 </span>
-                <span className="text-xs font-medium text-gray-600">{resultado.cangrejo.nivel}</span>
+                <span className="text-sm text-gray-400">/ {resultado.cangrejo.maximo}</span>
+                <span className="text-xs font-medium text-gray-600 ml-1">{resultado.cangrejo.nivel}</span>
               </div>
-              {resultado.cangrejo.vecesBase != null && (
-                <div className="text-xs text-gray-500 mt-1">
-                  {resultado.cangrejo.vecesBase}x la tasa base ({resultado.cangrejo.tasaBase}%)
-                </div>
-              )}
-              {resultado.cangrejo.antiguedadRiesgo && (
-                <div className="text-xs text-orange-700 mt-1">⚠️ Año &lt; 2016</div>
-              )}
+              <div className="mt-3 h-2 w-full rounded-full bg-gray-200 overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${
+                    resultado.cangrejo.nivel === "MUY PROBABLE" ? "bg-red-500" :
+                    resultado.cangrejo.nivel === "PROBABLE" ? "bg-orange-500" : "bg-green-500"
+                  }`}
+                  style={{ width: `${(resultado.cangrejo.puntaje / resultado.cangrejo.maximo) * 100}%` }}
+                />
+              </div>
+              <div className="text-[11px] text-gray-400 mt-1.5">
+                menos de 5: poco probable · 5 a 7: probable · 8 o más: muy probable
+              </div>
             </div>
           </div>
 
-          {resultado.cangrejo.detalle && (
-            <details className="border rounded-lg p-3 text-sm">
-              <summary className="cursor-pointer font-medium">¿De dónde sale ese porcentaje?</summary>
-              <div className="mt-2 text-xs text-gray-600 space-y-1">
-                <div>
-                  Marca: {resultado.cangrejo.detalle.marca.cangrejos} cangrejos en{" "}
-                  {resultado.cangrejo.detalle.marca.autos} autos → {resultado.cangrejo.detalle.marca.tasa}%
-                </div>
-                <div>
-                  Modelo: {resultado.cangrejo.detalle.modelo.cangrejos} cangrejos en{" "}
-                  {resultado.cangrejo.detalle.modelo.autos} autos → {resultado.cangrejo.detalle.modelo.tasa}%
-                  <span className="text-gray-400"> (ajustada hacia la marca si la muestra es chica)</span>
-                </div>
-                <div>Factor por año: ×{resultado.cangrejo.detalle.factorAnio}</div>
-              </div>
+          {resultado.cangrejo.criterios && (
+            <details className="border border-gray-100 rounded-xl p-4 text-sm">
+              <summary className="cursor-pointer font-medium">¿De dónde sale ese puntaje?</summary>
+              <ul className="mt-3 space-y-1.5">
+                {resultado.cangrejo.criterios.map(
+                  (c: { descripcion: string; puntos: number; cumple: boolean }) => (
+                    <li
+                      key={c.descripcion}
+                      className={`flex items-center justify-between text-xs ${
+                        c.cumple ? "text-gray-800" : "text-gray-400"
+                      }`}
+                    >
+                      <span>
+                        {c.cumple ? "✓" : "○"} {c.descripcion}
+                      </span>
+                      <span className={c.cumple ? "font-semibold" : ""}>
+                        {c.cumple ? `+${c.puntos}` : "0"}
+                      </span>
+                    </li>
+                  )
+                )}
+                <li className="flex items-center justify-between text-xs font-semibold border-t border-gray-100 pt-1.5 mt-1.5">
+                  <span>Total</span>
+                  <span>{resultado.cangrejo.puntaje} / {resultado.cangrejo.maximo}</span>
+                </li>
+              </ul>
             </details>
           )}
 
-          <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
-            <h3 className="text-sm font-semibold mb-3">📊 Datos históricos analizados:</h3>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="bg-white rounded p-3 text-center">
-                <div className="text-red-600 font-bold">{resultado.stats.devoluciones} Devoluciones</div>
+          <div className="bg-blue-50/60 border border-blue-100 rounded-xl p-5">
+            <h3 className="text-sm font-semibold mb-4">📊 Datos históricos analizados:</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="bg-white border border-gray-100 rounded-lg p-4 text-center">
+                <div className="text-2xl font-bold text-red-600">{resultado.stats.devoluciones}</div>
+                <div className="text-xs text-gray-500 mt-0.5">Devoluciones</div>
               </div>
-              <div className="bg-white rounded p-3 text-center">
-                <div className="text-orange-600 font-bold">{resultado.stats.cangrejos} Cangrejos</div>
+              <div className="bg-white border border-gray-100 rounded-lg p-4 text-center">
+                <div className="text-2xl font-bold text-orange-600">{resultado.stats.cangrejos}</div>
+                <div className="text-xs text-gray-500 mt-0.5">Cangrejos</div>
               </div>
-              <div className="bg-white rounded p-3 text-center">
-                <div className="text-blue-600 font-bold mb-1">{resultado.stats.ots} Órdenes de Trabajo</div>
-                <div className="text-[10px] text-gray-400 mb-1">con más de 3 OTs</div>
-                <ul className="text-xs text-gray-600 text-left list-disc list-inside">
-                  {resultado.stats.otsListado.map((o: string) => <li key={o}>{o}</li>)}
-                </ul>
-                {resultado.stats.otsBajoUmbral?.length > 0 && (
-                  <div className="text-left mt-1">
-                    <div className="text-[10px] text-gray-400">Ninguna supera 3 OTs. Antecedentes puntuales:</div>
-                    <ul className="text-xs text-gray-500 list-disc list-inside">
-                      {resultado.stats.otsBajoUmbral.map((o: string) => <li key={o}>{o}</li>)}
+              <div className="bg-white border border-gray-100 rounded-lg p-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600">{resultado.stats.totalTiposOts}</div>
+                  <div className="text-xs text-gray-500 mt-0.5">tipos de falla registrados</div>
+                  <div className="text-[11px] text-gray-400 mt-0.5">
+                    {resultado.stats.ots > 0
+                      ? `${resultado.stats.ots} con más de 3 OTs`
+                      : "ninguno supera 3 OTs"}
+                  </div>
+                </div>
+                {resultado.stats.otsTop10?.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-gray-100">
+                    <div className="text-[11px] text-gray-400 mb-1">
+                      Top {resultado.stats.otsTop10.length} OTs con mayor frecuencia:
+                    </div>
+                    <ul className="text-xs list-disc list-inside space-y-0.5">
+                      {resultado.stats.otsTop10.map(
+                        (o: { item: string; count: number; sobreUmbral: boolean }) => (
+                          <li
+                            key={o.item}
+                            className={o.sobreUmbral ? "text-blue-700 font-semibold" : "text-gray-500"}
+                          >
+                            {o.item} ({o.count})
+                          </li>
+                        )
+                      )}
                     </ul>
                   </div>
                 )}
@@ -292,14 +375,14 @@ export default function Home() {
 
           <div className="space-y-2">
             {resultado.items.map((it: { titulo: string; tag: string; criticidad: number }, i: number) => (
-              <details key={i} className="border rounded-lg p-3">
-                <summary className="flex items-center justify-between cursor-pointer">
+              <details key={i} className="border border-gray-100 rounded-xl p-3.5 hover:border-gray-200 transition">
+                <summary className="flex items-center justify-between cursor-pointer gap-3">
                   <span className="font-medium text-sm">{it.titulo}</span>
-                  <span className="flex items-center gap-2 shrink-0 ml-3">
-                    <span className="bg-gray-100 text-gray-700 text-xs rounded-full px-2 py-0.5">{it.tag}</span>
+                  <span className="flex items-center gap-2 shrink-0">
+                    <span className="bg-gray-100 text-gray-600 text-xs rounded-full px-2.5 py-0.5">{it.tag}</span>
                     <span
-                      className={`text-white text-xs rounded-full px-2 py-0.5 ${
-                        it.criticidad >= 5 ? "bg-red-600" : it.criticidad >= 4 ? "bg-red-500" : "bg-gray-500"
+                      className={`text-white text-xs rounded-full px-2.5 py-0.5 ${
+                        it.criticidad >= 5 ? "bg-red-600" : it.criticidad >= 4 ? "bg-red-500" : "bg-gray-400"
                       }`}
                     >
                       Criticidad {it.criticidad}
