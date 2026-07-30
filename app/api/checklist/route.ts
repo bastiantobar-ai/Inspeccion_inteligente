@@ -64,7 +64,12 @@ export async function POST(req: NextRequest) {
     tieneVersion
       ? supabase.from("insp_dif").select("kms_inspe_plus, link").eq("aux_sku", fullAuxSku).maybeSingle()
       : supabase.rpc("insp_dif_grupo", { p_marca: marca, p_modelo: modelo, p_anio: anioStr }).maybeSingle(),
-    supabase.rpc("top_ots_grupo", { p_marca: marca, p_modelo: modelo }),
+    supabase.rpc("top_ots_grupo", {
+      p_marca: marca,
+      p_modelo: modelo,
+      p_anio: anio,
+      p_version: version ?? null,
+    }),
     supabase.rpc("contar_cangrejos_grupo", { p_marca: marca, p_modelo: modelo }),
     supabase.rpc("indice_cangrejo", { p_marca: marca, p_modelo: modelo, p_anio: anio }),
     tieneVersion
