@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Combobox from "./components/Combobox";
 
 type Opciones = { marca: string[]; modelo: string[]; version: string[]; anio: string[] };
 
@@ -121,31 +122,30 @@ export default function Home() {
         <h2 className="font-semibold text-lg mb-5">🔍 Búsqueda de Vehículo</h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
-          <div>
-            <label className={LABEL_CLASS}>Marca</label>
-            <input list="lista-marca" className={INPUT_CLASS} value={marca} onFocus={onMarcaFocus}
-              onChange={(e) => onChangeMarca(e.target.value)} placeholder="Escribe o selecciona..." />
-            <datalist id="lista-marca">
-              {opciones.marca.map((v) => <option key={v} value={v} />)}
-            </datalist>
-          </div>
+          <Combobox
+            label="Marca"
+            value={marca}
+            options={opciones.marca}
+            onFocus={onMarcaFocus}
+            onChange={onChangeMarca}
+          />
+
+          <Combobox
+            label="Modelo"
+            value={modelo}
+            options={opciones.modelo}
+            disabled={!marca}
+            onChange={onChangeModelo}
+          />
 
           <div>
-            <label className={LABEL_CLASS}>Modelo</label>
-            <input list="lista-modelo" className={INPUT_CLASS} value={modelo} disabled={!marca}
-              onChange={(e) => onChangeModelo(e.target.value)} placeholder="Escribe o selecciona..." />
-            <datalist id="lista-modelo">
-              {opciones.modelo.map((v) => <option key={v} value={v} />)}
-            </datalist>
-          </div>
-
-          <div>
-            <label className={LABEL_CLASS}>Versión <span className="font-normal text-gray-400">(opcional)</span></label>
-            <input list="lista-version" className={INPUT_CLASS} value={version} disabled={!modelo || sinVersion}
-              onChange={(e) => onChangeVersion(e.target.value)} placeholder="Escribe o selecciona..." />
-            <datalist id="lista-version">
-              {opciones.version.map((v) => <option key={v} value={v} />)}
-            </datalist>
+            <Combobox
+              label={<>Versión <span className="font-normal text-gray-400">(opcional)</span></>}
+              value={version}
+              options={opciones.version}
+              disabled={!modelo || sinVersion}
+              onChange={onChangeVersion}
+            />
             {modelo && !version && (
               <button type="button" onClick={onToggleSinVersion}
                 className={`text-xs mt-1.5 underline ${sinVersion ? "text-blue-700 font-medium" : "text-gray-500 hover:text-gray-700"}`}>
@@ -154,14 +154,13 @@ export default function Home() {
             )}
           </div>
 
-          <div>
-            <label className={LABEL_CLASS}>Año</label>
-            <input list="lista-anio" className={INPUT_CLASS} value={anio} disabled={!version && !sinVersion}
-              onChange={(e) => setAnio(e.target.value)} placeholder="Escribe o selecciona..." />
-            <datalist id="lista-anio">
-              {opciones.anio.map((v) => <option key={v} value={v} />)}
-            </datalist>
-          </div>
+          <Combobox
+            label="Año"
+            value={anio}
+            options={opciones.anio}
+            disabled={!version && !sinVersion}
+            onChange={setAnio}
+          />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-5">
