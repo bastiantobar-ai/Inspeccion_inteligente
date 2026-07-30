@@ -9,7 +9,7 @@
  * Criterios (suman 10 en el peor caso):
  *   CQI D o E ............................ 2 pts
  *   Año anterior a 2016 .................. 3 pts
- *   Más de 10 tipos de OT distintos ...... 3 pts
+ *   Más de 10 ítems de trabajo distintos . 3 pts
  *   Marca+modelo ya es cangrejo >2 veces . 2 pts
  *
  * Lectura:
@@ -55,7 +55,10 @@ export function calcularRiesgoCangrejo(params: {
       cumple: anio < 2016,
     },
     {
-      descripcion: `${tiposOtsDistintos} tipos de OT distintos (más de 10)`,
+      // work_item_name = ítem de reparación (FILTRO DE ACEITE, NEUMATICO...),
+      // no el área de taller. Son ~103 valores posibles, por eso un modelo
+      // con historial supera 10 sin problema.
+      descripcion: `${tiposOtsDistintos} ítems de trabajo distintos (más de 10)`,
       puntos: 3,
       cumple: tiposOtsDistintos > 10,
     },
