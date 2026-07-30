@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase";
 import { calcularCqi } from "@/lib/cqi";
+import { calcularRiesgoCangrejo } from "@/lib/cangrejo";
 
 export const dynamic = "force-dynamic";
 
@@ -23,20 +24,6 @@ type Item = { titulo: string; tag: Tag; criticidad: number };
 
 type OtRow = { work_item_name: string; cantidad: number; sobre_umbral: boolean };
 
-type IndiceCangrejo = {
-  probabilidad: number;
-  nivel: string;
-  veces_base: number;
-  tasa_base: number;
-  cang_marca: number;
-  exp_marca: number;
-  tasa_marca: number;
-  cang_modelo: number;
-  exp_modelo: number;
-  tasa_modelo: number;
-  factor_anio: number;
-};
-
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const { marca, modelo, version, anio, km, email } = body as {
@@ -56,8 +43,8 @@ export async function POST(req: NextRequest) {
   const [
     inspResult,
     { data: topOtsRpc, error: errOts },
+    { data: totalTiposOtsRpc, error: errTotalOts },
     { data: cangrejosCount, error: errCangrejos },
-    { data: indiceRpc, error: errIndice },
     devsResult,
     { data: alertas },
   ] = await Promise.all([
@@ -70,8 +57,13 @@ export async function POST(req: NextRequest) {
       p_anio: anio,
       p_version: version ?? null,
     }),
+    supabase.rpc("contar_tipos_ots_grupo", {
+      p_marca: marca,
+      p_modelo: modelo,
+      p_anio: anio,
+      p_version: version ?? null,
+    }),
     supabase.rpc("contar_cangrejos_grupo", { p_marca: marca, p_modelo: modelo }),
-    supabase.rpc("indice_cangrejo", { p_marca: marca, p_modelo: modelo, p_anio: anio }),
     tieneVersion
       ? supabase.from("devoluciones").select("descripcion").eq("aux_sku", fullAuxSku)
       : supabase.rpc("devoluciones_grupo", { p_marca: marca, p_modelo: modelo, p_anio: anioStr }),
@@ -79,8 +71,8 @@ export async function POST(req: NextRequest) {
   ]);
 
   if (errOts) return NextResponse.json({ error: errOts.message }, { status: 500 });
+  if (errTotalOts) return NextResponse.json({ error: errTotalOts.message }, { status: 500 });
   if (errCangrejos) return NextResponse.json({ error: errCangrejos.message }, { status: 500 });
-  if (errIndice) return NextResponse.json({ error: errIndice.message }, { status: 500 });
 
   const insp = inspResult.data as { kms_inspe_plus: number; link: string } | null;
   const devs = (devsResult.data ?? []) as { descripcion: string }[];
@@ -93,10 +85,18 @@ export async function POST(req: NextRequest) {
   // Regla de negocio: "TOP 10 OTS mayor 3 OTS".
   const otsFrecuentes = todasOts.filter((o) => o.sobreUmbral);
 
-  const cangrejosDelGrupo = cangrejosCount ?? 0;
-  const indice = (Array.isArray(indiceRpc) ? indiceRpc[0] : indiceRpc) as IndiceCangrejo | undefined;
+  // Number(): las RPC de conteo devuelven bigint y PostgREST puede
+  // serializarlo como string, lo que rompería las comparaciones.
+  const cangrejosDelGrupo = Number(cangrejosCount ?? 0);
+  const totalTiposOts = Number(totalTiposOtsRpc ?? todasOts.length);
 
   const cqi = calcularCqi(marca, anio, km);
+  const riesgo = calcularRiesgoCangrejo({
+    cqi: cqi.grado,
+    anio,
+    tiposOtsDistintos: totalTiposOts,
+    cangrejosMarcaModelo: cangrejosDelGrupo,
+  });
 
   const alertaMotor = version
     ? (alertas ?? []).find((a: any) => normaliza(version).includes(normaliza(a.motor)))
@@ -114,12 +114,12 @@ export async function POST(req: NextRequest) {
   }
 
   // Riesgo de cangrejo alto sin que el modelo tenga uno registrado:
-  // igual hay que advertirlo, es el aporte del índice.
-  if (cangrejosDelGrupo === 0 && indice && (indice.nivel === "ALTA" || indice.nivel === "MUY ALTA")) {
+  // igual hay que advertirlo, es el aporte del puntaje.
+  if (cangrejosDelGrupo === 0 && riesgo.nivel !== "POCO PROBABLE") {
     items.push({
-      titulo: `RIESGO DE CANGREJO ${indice.nivel} (${indice.probabilidad}%) - Diagnóstico motor general preventivo`,
+      titulo: `RIESGO DE CANGREJO ${riesgo.nivel} (${riesgo.puntaje}/10) - Diagnóstico motor general preventivo`,
       tag: "motor",
-      criticidad: indice.nivel === "MUY ALTA" ? 5 : 4,
+      criticidad: riesgo.nivel === "MUY PROBABLE" ? 5 : 4,
     });
   }
 
@@ -175,25 +175,18 @@ export async function POST(req: NextRequest) {
       devoluciones: devs.length,
       cangrejos: cangrejosDelGrupo,
       ots: otsFrecuentes.length,
-      otsListado: otsFrecuentes.map((o) => `${o.item} (${o.count})`),
-      otsBajoUmbral: otsFrecuentes.length === 0 ? todasOts.map((o) => `${o.item} (${o.count})`) : [],
+      totalTiposOts,
+      otsTop10: todasOts,
     },
     items,
     devoluciones: devs.map((d) => d.descripcion),
-    cangrejo: indice
-      ? {
-          probabilidad: indice.probabilidad,
-          nivel: indice.nivel,
-          vecesBase: indice.veces_base,
-          tasaBase: indice.tasa_base,
-          antiguedadRiesgo: anio < 2016,
-          detalle: {
-            marca: { cangrejos: indice.cang_marca, autos: indice.exp_marca, tasa: indice.tasa_marca },
-            modelo: { cangrejos: indice.cang_modelo, autos: indice.exp_modelo, tasa: indice.tasa_modelo },
-            factorAnio: indice.factor_anio,
-          },
-        }
-      : { probabilidad: null, nivel: "SIN DATOS", antiguedadRiesgo: anio < 2016 },
+    cangrejo: {
+      puntaje: riesgo.puntaje,
+      maximo: riesgo.maximo,
+      nivel: riesgo.nivel,
+      criterios: riesgo.criterios,
+      antiguedadRiesgo: anio < 2016,
+    },
     alertaMotor: alertaMotor ? { motor: alertaMotor.motor, link: alertaMotor.link } : null,
     email: email ?? null,
   });
