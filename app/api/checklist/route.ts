@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
   const [
     inspResult,
     { data: topOtsRpc, error: errOts },
-    { data: totalTiposOtsRpc, error: errTotalOts },
+    { data: resumenOtsRpc, error: errResumenOts },
     { data: cangrejosCount, error: errCangrejos },
     devsResult,
     { data: alertas },
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
       p_anio: anio,
       p_version: version ?? null,
     }),
-    supabase.rpc("contar_tipos_ots_grupo", {
+    supabase.rpc("resumen_ots_grupo", {
       p_marca: marca,
       p_modelo: modelo,
       p_anio: anio,
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
   ]);
 
   if (errOts) return NextResponse.json({ error: errOts.message }, { status: 500 });
-  if (errTotalOts) return NextResponse.json({ error: errTotalOts.message }, { status: 500 });
+  if (errResumenOts) return NextResponse.json({ error: errResumenOts.message }, { status: 500 });
   if (errCangrejos) return NextResponse.json({ error: errCangrejos.message }, { status: 500 });
 
   const insp = inspResult.data as { kms_inspe_plus: number; link: string } | null;
@@ -88,7 +88,13 @@ export async function POST(req: NextRequest) {
   // Number(): las RPC de conteo devuelven bigint y PostgREST puede
   // serializarlo como string, lo que rompería las comparaciones.
   const cangrejosDelGrupo = Number(cangrejosCount ?? 0);
-  const totalTiposOts = Number(totalTiposOtsRpc ?? todasOts.length);
+
+  const resumenOts = (Array.isArray(resumenOtsRpc) ? resumenOtsRpc[0] : resumenOtsRpc) as
+    | { tipos_distintos: number; recurrentes: number }
+    | undefined;
+  const totalTiposOts = Number(resumenOts?.tipos_distintos ?? todasOts.length);
+  // Sin limit 10, a diferencia de otsFrecuentes (que sale del top 10).
+  const otsRecurrentes = Number(resumenOts?.recurrentes ?? otsFrecuentes.length);
 
   const cqi = calcularCqi(marca, anio, km);
   const riesgo = calcularRiesgoCangrejo({
@@ -174,7 +180,7 @@ export async function POST(req: NextRequest) {
     stats: {
       devoluciones: devs.length,
       cangrejos: cangrejosDelGrupo,
-      ots: otsFrecuentes.length,
+      ots: otsRecurrentes,
       totalTiposOts,
       otsTop10: todasOts,
     },
