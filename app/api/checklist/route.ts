@@ -106,7 +106,6 @@ export async function POST(req: NextRequest) {
 
   const cqi = calcularCqi(marca, anio, km);
   const riesgo = calcularRiesgoCangrejo({
-    cqi: cqi.grado,
     anio,
     problemasRecurrentes: otsRecurrentes,
     cangrejosMarcaModelo: cangrejosDelGrupo,
