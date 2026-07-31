@@ -138,21 +138,30 @@ export default function Home() {
             onChange={onChangeModelo}
           />
 
-          <div>
-            <Combobox
-              label={<>Versión <span className="font-normal text-gray-400">(opcional)</span></>}
-              value={version}
-              options={opciones.version}
-              disabled={!modelo || sinVersion}
-              onChange={onChangeVersion}
-            />
-            {modelo && !version && (
-              <button type="button" onClick={onToggleSinVersion}
-                className={`text-xs mt-1.5 underline ${sinVersion ? "text-blue-700 font-medium" : "text-gray-500 hover:text-gray-700"}`}>
-                {sinVersion ? "✓ Sin versión específica" : "No tengo la versión"}
-              </button>
-            )}
-          </div>
+          <Combobox
+            label={<>Versión <span className="font-normal text-gray-400">(opcional)</span></>}
+            value={version}
+            options={opciones.version}
+            disabled={!modelo || sinVersion}
+            onChange={onChangeVersion}
+            accion={
+              modelo ? (
+                <button
+                  type="button"
+                  onClick={onToggleSinVersion}
+                  title={sinVersion ? "Volver a elegir una versión" : "Continuar sin especificar la versión"}
+                  className={
+                    "shrink-0 rounded-full border px-2 py-0.5 text-[11px] leading-none transition " +
+                    (sinVersion
+                      ? "border-blue-200 bg-blue-50 text-blue-700 font-medium"
+                      : "border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50 hover:text-gray-700")
+                  }
+                >
+                  {sinVersion ? "✓ sin versión" : "no la tengo"}
+                </button>
+              ) : null
+            }
+          />
 
           <Combobox
             label="Año"
@@ -341,13 +350,24 @@ export default function Home() {
               </div>
               <div className="bg-white border border-gray-100 rounded-lg p-4">
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-600">{resultado.stats.ots}</div>
+                  <div
+                    className={`text-2xl font-bold ${
+                      resultado.stats.ots > 5 ? "text-orange-600" : "text-blue-600"
+                    }`}
+                  >
+                    {resultado.stats.ots}
+                  </div>
                   <div className="text-xs text-gray-500 mt-0.5">
                     {resultado.stats.ots === 1 ? "problema recurrente" : "problemas recurrentes"}
                   </div>
                   <div className="text-[11px] text-gray-400 mt-0.5">
                     con más de 3 OTs · de {resultado.stats.totalTiposOts} ítems en el historial
                   </div>
+                  {resultado.stats.autosDelGrupo > 0 && (
+                    <div className="text-[11px] text-gray-400 mt-1">
+                      {resultado.stats.otsPorAuto} OTs/vehículo · {resultado.stats.autosDelGrupo} autos
+                    </div>
+                  )}
                 </div>
                 {resultado.stats.otsTop10?.length > 0 && (
                   <div className="mt-3 pt-3 border-t border-gray-100">
