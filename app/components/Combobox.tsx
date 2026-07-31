@@ -23,6 +23,8 @@ type Props = {
   onFocus?: () => void;
   disabled?: boolean;
   placeholder?: string;
+  /** Control opcional a la derecha del label (no empuja el input). */
+  accion?: ReactNode;
 };
 
 export default function Combobox({
@@ -33,6 +35,7 @@ export default function Combobox({
   onFocus,
   disabled = false,
   placeholder = "Escribe o selecciona...",
+  accion,
 }: Props) {
   const [abierto, setAbierto] = useState(false);
   const [texto, setTexto] = useState(value);
@@ -109,7 +112,12 @@ export default function Combobox({
 
   return (
     <div ref={cajaRef} className="relative">
-      <label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>
+      {/* min-h fija la altura de la fila del label para que los inputs
+          queden alineados entre sí, tengan accion o no. */}
+      <div className="flex min-h-[1.25rem] items-center justify-between gap-2 mb-1.5">
+        <label className="block text-sm font-medium text-gray-700">{label}</label>
+        {accion}
+      </div>
 
       <div className="relative">
         <input
