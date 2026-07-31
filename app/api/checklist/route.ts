@@ -90,17 +90,25 @@ export async function POST(req: NextRequest) {
   const cangrejosDelGrupo = Number(cangrejosCount ?? 0);
 
   const resumenOts = (Array.isArray(resumenOtsRpc) ? resumenOtsRpc[0] : resumenOtsRpc) as
-    | { tipos_distintos: number; recurrentes: number }
+    | {
+        tipos_distintos: number;
+        recurrentes: number;
+        total_ots: number;
+        autos: number;
+        ots_por_auto: number;
+      }
     | undefined;
   const totalTiposOts = Number(resumenOts?.tipos_distintos ?? todasOts.length);
   // Sin limit 10, a diferencia de otsFrecuentes (que sale del top 10).
   const otsRecurrentes = Number(resumenOts?.recurrentes ?? otsFrecuentes.length);
+  const otsPorAuto = Number(resumenOts?.ots_por_auto ?? 0);
+  const autosDelGrupo = Number(resumenOts?.autos ?? 0);
 
   const cqi = calcularCqi(marca, anio, km);
   const riesgo = calcularRiesgoCangrejo({
     cqi: cqi.grado,
     anio,
-    tiposOtsDistintos: totalTiposOts,
+    problemasRecurrentes: otsRecurrentes,
     cangrejosMarcaModelo: cangrejosDelGrupo,
   });
 
@@ -182,6 +190,8 @@ export async function POST(req: NextRequest) {
       cangrejos: cangrejosDelGrupo,
       ots: otsRecurrentes,
       totalTiposOts,
+      otsPorAuto,
+      autosDelGrupo,
       otsTop10: todasOts,
     },
     items,
