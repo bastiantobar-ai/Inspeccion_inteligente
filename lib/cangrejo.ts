@@ -9,8 +9,18 @@
  * Criterios (suman 10 en el peor caso):
  *   CQI D o E ............................ 2 pts
  *   Año anterior a 2016 .................. 3 pts
- *   Más de 10 ítems de trabajo distintos . 3 pts
- *   Marca+modelo ya es cangrejo >2 veces . 2 pts
+ *   Más de 5 problemas recurrentes ....... 2 pts
+ *   Marca+modelo ya es cangrejo >2 veces . 3 pts
+ *
+ * "Problema recurrente" = work_item_name con más de 3 OTs en el
+ * grupo. Es el mismo número que la tarjeta muestra como titular.
+ *
+ * Sobre el criterio de OTs: la primera versión contaba ítems de
+ * trabajo DISTINTOS con umbral 10, pero se cumplía en el 100% de
+ * los casos reales (el mínimo medido fue 64) — era un +2 constante.
+ * Además crecía con el tamaño de la flota, así que medía
+ * popularidad del modelo, no riesgo. Contar solo los recurrentes
+ * corrige eso: exige que el problema se repita, no que exista.
  *
  * Lectura:
  *   < 5   → poco probable
@@ -38,10 +48,10 @@ export type ResultadoCangrejo = {
 export function calcularRiesgoCangrejo(params: {
   cqi: Cqi;
   anio: number;
-  tiposOtsDistintos: number;
+  problemasRecurrentes: number;
   cangrejosMarcaModelo: number;
 }): ResultadoCangrejo {
-  const { cqi, anio, tiposOtsDistintos, cangrejosMarcaModelo } = params;
+  const { cqi, anio, problemasRecurrentes, cangrejosMarcaModelo } = params;
 
   const criterios: CriterioCangrejo[] = [
     {
@@ -55,16 +65,13 @@ export function calcularRiesgoCangrejo(params: {
       cumple: anio < 2016,
     },
     {
-      // work_item_name = ítem de reparación (FILTRO DE ACEITE, NEUMATICO...),
-      // no el área de taller. Son ~103 valores posibles, por eso un modelo
-      // con historial supera 10 sin problema.
-      descripcion: `${tiposOtsDistintos} ítems de trabajo distintos (más de 10)`,
-      puntos: 3,
-      cumple: tiposOtsDistintos > 10,
+      descripcion: `${problemasRecurrentes} problemas recurrentes (más de 5)`,
+      puntos: 2,
+      cumple: problemasRecurrentes > 5,
     },
     {
       descripcion: `${cangrejosMarcaModelo} cangrejos previos del modelo (más de 2)`,
-      puntos: 2,
+      puntos: 3,
       cumple: cangrejosMarcaModelo > 2,
     },
   ];
