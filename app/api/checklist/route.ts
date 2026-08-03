@@ -1,26 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase";
 import { calcularCqi } from "@/lib/cqi";
-import { calcularProbabilidadCangrejo } from "@/lib/cangrejo";
+import { calcularIndiceCangrejo } from "@/lib/cangrejo";
 
 export const dynamic = "force-dynamic";
 
 function normaliza(s: string) {
   return (s || "").toUpperCase().trim();
 }
-
-type Tag = "motor" | "transmision" | "electronicos" | "suspension" | "carroceria";
-
-function categorizar(workItemName: string): Tag {
-  const n = normaliza(workItemName);
-  if (n.includes("CAMBIO") || n.includes("TRANSMISION") || n.includes("CAJA") || n.includes("CREMALLERA")) return "transmision";
-  if (n.includes("ELECTR") || n.includes("OBD") || n.includes("SENSOR") || n.includes("CHECK ENGINE") || n.includes("TESTIGO")) return "electronicos";
-  if (n.includes("SUSPENSION") || n.includes("AMORTIGUADOR")) return "suspension";
-  if (n.includes("CARROCERIA") || n.includes("PINTURA") || n.includes("CHOQUE") || n.includes("PARAGOLPE")) return "carroceria";
-  return "motor";
-}
-
-type Item = { titulo: string; tag: Tag };
 
 type OtRow = {
   work_item_name: string;
@@ -125,7 +112,7 @@ export async function POST(req: NextRequest) {
   const autosDelGrupo = Number(resumenOts?.autos_grupo ?? 0);
 
   const cqi = calcularCqi(marca, anio, km);
-  const probabilidad = calcularProbabilidadCangrejo({
+  const riesgo = calcularIndiceCangrejo({
     cqiPuntaje: cqi.puntaje,
     vecesBase,
     autosMarcaModelo,
@@ -135,43 +122,10 @@ export async function POST(req: NextRequest) {
     ? (alertas ?? []).find((a: any) => normaliza(version).includes(normaliza(a.motor)))
     : undefined;
 
-  // ── Armado del checklist ──
-  const items: Item[] = [];
-
-  if (cangrejosDelGrupo > 0) {
-    items.push({
-      titulo: "CANGREJO - Vehículo NO se pudo vender en Kavak - Diagnóstico motor general",
-      tag: "motor",
-    });
-  }
-
-  // Riesgo de cangrejo alto sin que el modelo tenga uno registrado:
-  // igual hay que advertirlo, es el aporte del indicador.
-  if (cangrejosDelGrupo === 0 && probabilidad.nivel !== "POCO PROBABLE") {
-    items.push({
-      titulo: `RIESGO DE CANGREJO ${probabilidad.nivel} (${probabilidad.porcentaje}%) - Diagnóstico motor general preventivo`,
-      tag: "motor",
-    });
-  }
-
-  const modeloAnio = `${marca} ${modelo} ${anio}`;
-
-  // Fallas del modelo, redactadas por incidencia y ya ordenadas de
-  // mayor a menor por top_ots_grupo — el orden es la prioridad.
-  for (const ot of todasOts) {
-    const tag = categorizar(ot.item);
-    const sufijo = tag === "electronicos" ? " - OBD2/sensores" : tag === "motor" ? " - Diagnóstico motor general" : "";
-    const titulo = ot.pct != null
-      ? `El ${ot.pct}% de los ${modeloAnio} presenta ${ot.item}${sufijo}`
-      : `${ot.item} en ${ot.autos} ${modeloAnio}${sufijo}`;
-    items.push({ titulo, tag });
-  }
-
-  items.push({ titulo: `Fallas en sistema de transmisión - ${modeloAnio}`, tag: "transmision" });
-  items.push({ titulo: `Problemas generales de motor - ${modeloAnio}`, tag: "motor" });
-  items.push({ titulo: `Problemas de carrocería - ${modeloAnio} - Diagnóstico motor general`, tag: "motor" });
-  items.push({ titulo: `Fallas en sistemas eléctricos - ${modeloAnio} - OBD2/sensores`, tag: "electronicos" });
-  items.push({ titulo: `Problemas de suspensión - ${modeloAnio}`, tag: "suspension" });
+  // El listado de items se eliminó: repetía uno por uno lo que ya
+  // muestra el ranking de fallas ("El 21,1% de los X presenta Y" vs
+  // "Y — 21,1%"), más unos items genéricos fijos que no salían de
+  // ningún dato ("Problemas generales de motor - X").
 
   return NextResponse.json({
     auxSku: fullAuxSku ?? `${normaliza(marca)}-${normaliza(modelo)}-${anio}`,
@@ -188,7 +142,6 @@ export async function POST(req: NextRequest) {
       autosDelGrupo,
       otsTop10: todasOts,
     },
-    items,
     devoluciones: devs.map((d) => d.descripcion),
     cangrejo: {
       // KPI independiente: tasa real del grupo marca+modelo.
@@ -199,12 +152,13 @@ export async function POST(req: NextRequest) {
         tasaBase,
         vecesBase,
       },
-      // Indicador combinado: CQI (30%) + tasa (70%).
-      probabilidad: {
-        porcentaje: probabilidad.porcentaje,
-        nivel: probabilidad.nivel,
-        muestraSuficiente: probabilidad.muestraSuficiente,
-        componentes: probabilidad.componentes,
+      // Índice de riesgo 0-100: CQI (30%) + tasa (70%). NO es una
+      // probabilidad — la probabilidad real es tasa.tasaMm.
+      riesgo: {
+        indice: riesgo.indice,
+        nivel: riesgo.nivel,
+        muestraSuficiente: riesgo.muestraSuficiente,
+        componentes: riesgo.componentes,
       },
     },
     alertaMotor: alertaMotor ? { motor: alertaMotor.motor, link: alertaMotor.link } : null,
