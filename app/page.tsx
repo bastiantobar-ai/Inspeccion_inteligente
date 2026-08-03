@@ -334,6 +334,16 @@ export default function Home() {
                   <span>{resultado.cangrejo.puntaje} / {resultado.cangrejo.maximo}</span>
                 </li>
               </ul>
+              {resultado.cangrejo.tasa && (
+                <div className="mt-3 pt-3 border-t border-gray-100 text-[11px] text-gray-400 space-y-0.5">
+                  <div>
+                    Tasa del modelo: {resultado.cangrejo.tasa.cangrejosMm} cangrejos en{" "}
+                    {resultado.cangrejo.tasa.autosMm} autos
+                    {resultado.cangrejo.tasa.tasaMm != null && ` → ${resultado.cangrejo.tasa.tasaMm}%`}
+                  </div>
+                  <div>Tasa base global: {resultado.cangrejo.tasa.tasaBase}%</div>
+                </div>
+              )}
             </details>
           )}
 
