@@ -249,7 +249,7 @@ export default function Home() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="border border-gray-100 bg-gray-50/50 rounded-xl p-4">
               <div className="text-xs text-gray-500 mb-1">CQI · Marca-Año-KM</div>
               <div className="flex items-baseline gap-2">
@@ -280,70 +280,76 @@ export default function Home() {
             </div>
 
             <div className="border border-gray-100 bg-gray-50/50 rounded-xl p-4">
-              <div className="text-xs text-gray-500 mb-1">Riesgo de cangrejo</div>
+              <div className="text-xs text-gray-500 mb-1">Tasa de cangrejo</div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-4xl font-bold text-gray-800">
+                  {resultado.cangrejo.tasa.tasaMm != null ? `${resultado.cangrejo.tasa.tasaMm}%` : "—"}
+                </span>
+              </div>
+              <div className="text-xs text-gray-500 mt-2">
+                {resultado.cangrejo.tasa.cangrejosMm} cangrejos en {resultado.cangrejo.tasa.autosMm} autos del modelo
+              </div>
+              <div className="text-[11px] text-gray-400 mt-1">
+                base global: {resultado.cangrejo.tasa.tasaBase}%
+                {resultado.cangrejo.tasa.vecesBase != null && ` · ${resultado.cangrejo.tasa.vecesBase}x`}
+              </div>
+            </div>
+
+            <div className="border border-gray-100 bg-gray-50/50 rounded-xl p-4">
+              <div className="text-xs text-gray-500 mb-1">Probabilidad de cangrejo</div>
               <div className="flex items-baseline gap-2">
                 <span
                   className={`text-4xl font-bold ${
-                    resultado.cangrejo.nivel === "MUY PROBABLE" ? "text-red-600" :
-                    resultado.cangrejo.nivel === "PROBABLE" ? "text-orange-600" : "text-green-600"
+                    resultado.cangrejo.probabilidad.nivel === "MUY PROBABLE" ? "text-red-600" :
+                    resultado.cangrejo.probabilidad.nivel === "PROBABLE" ? "text-orange-600" : "text-green-600"
                   }`}
                 >
-                  {resultado.cangrejo.puntaje}
+                  {resultado.cangrejo.probabilidad.porcentaje}%
                 </span>
-                <span className="text-sm text-gray-400">/ {resultado.cangrejo.maximo}</span>
-                <span className="text-xs font-medium text-gray-600 ml-1">{resultado.cangrejo.nivel}</span>
+              </div>
+              <div className="text-xs font-medium text-gray-600 mt-1">
+                {resultado.cangrejo.probabilidad.nivel}
               </div>
               <div className="mt-3 h-2 w-full rounded-full bg-gray-200 overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all ${
-                    resultado.cangrejo.nivel === "MUY PROBABLE" ? "bg-red-500" :
-                    resultado.cangrejo.nivel === "PROBABLE" ? "bg-orange-500" : "bg-green-500"
+                    resultado.cangrejo.probabilidad.nivel === "MUY PROBABLE" ? "bg-red-500" :
+                    resultado.cangrejo.probabilidad.nivel === "PROBABLE" ? "bg-orange-500" : "bg-green-500"
                   }`}
-                  style={{ width: `${(resultado.cangrejo.puntaje / resultado.cangrejo.maximo) * 100}%` }}
+                  style={{ width: `${resultado.cangrejo.probabilidad.porcentaje}%` }}
                 />
               </div>
               <div className="text-[11px] text-gray-400 mt-1.5">
-                menos de 5: poco probable · 5 a 7: probable · 8 o más: muy probable
+                menos de 30%: poco probable · 30-59%: probable · 60% o más: muy probable
               </div>
+              {!resultado.cangrejo.probabilidad.muestraSuficiente && (
+                <div className="text-[11px] text-amber-600 mt-1">
+                  Muestra insuficiente del modelo: se asumió tasa promedio
+                </div>
+              )}
             </div>
           </div>
 
-          {resultado.cangrejo.criterios && (
+          {resultado.cangrejo.probabilidad.componentes && (
             <details className="border border-gray-100 rounded-xl p-4 text-sm">
-              <summary className="cursor-pointer font-medium">¿De dónde sale ese puntaje?</summary>
+              <summary className="cursor-pointer font-medium">¿De dónde sale ese porcentaje?</summary>
               <ul className="mt-3 space-y-1.5">
-                {resultado.cangrejo.criterios.map(
-                  (c: { descripcion: string; puntos: number; cumple: boolean }) => (
-                    <li
-                      key={c.descripcion}
-                      className={`flex items-center justify-between text-xs ${
-                        c.cumple ? "text-gray-800" : "text-gray-400"
-                      }`}
-                    >
-                      <span>
-                        {c.cumple ? "✓" : "○"} {c.descripcion}
-                      </span>
-                      <span className={c.cumple ? "font-semibold" : ""}>
-                        {c.cumple ? `+${c.puntos}` : "0"}
-                      </span>
-                    </li>
-                  )
-                )}
+                <li className="flex items-center justify-between text-xs text-gray-800">
+                  <span>CQI (puntaje {resultado.cangrejo.probabilidad.componentes.cqi.puntaje}/100) — riesgo {resultado.cangrejo.probabilidad.componentes.cqi.riesgo}</span>
+                  <span className="font-semibold">{resultado.cangrejo.probabilidad.componentes.cqi.pesoPct}%</span>
+                </li>
+                <li className="flex items-center justify-between text-xs text-gray-800">
+                  <span>Tasa ({resultado.cangrejo.probabilidad.componentes.tasa.vecesBaseUsado}x la base) — riesgo {resultado.cangrejo.probabilidad.componentes.tasa.riesgo}</span>
+                  <span className="font-semibold">{resultado.cangrejo.probabilidad.componentes.tasa.pesoPct}%</span>
+                </li>
                 <li className="flex items-center justify-between text-xs font-semibold border-t border-gray-100 pt-1.5 mt-1.5">
-                  <span>Total</span>
-                  <span>{resultado.cangrejo.puntaje} / {resultado.cangrejo.maximo}</span>
+                  <span>Probabilidad final</span>
+                  <span>{resultado.cangrejo.probabilidad.porcentaje}%</span>
                 </li>
               </ul>
-              {resultado.cangrejo.tasa && (
-                <div className="mt-3 pt-3 border-t border-gray-100 text-[11px] text-gray-400 space-y-0.5">
-                  <div>
-                    Tasa del modelo: {resultado.cangrejo.tasa.cangrejosMm} cangrejos en{" "}
-                    {resultado.cangrejo.tasa.autosMm} autos
-                    {resultado.cangrejo.tasa.tasaMm != null && ` → ${resultado.cangrejo.tasa.tasaMm}%`}
-                  </div>
-                  <div>Tasa base global: {resultado.cangrejo.tasa.tasaBase}%</div>
-                </div>
-              )}
+              <div className="mt-3 pt-3 border-t border-gray-100 text-[11px] text-gray-400">
+                probabilidad = 30% × riesgo por CQI + 70% × riesgo por tasa
+              </div>
             </details>
           )}
 
@@ -358,64 +364,60 @@ export default function Home() {
                 <div className="text-2xl font-bold text-orange-600">{resultado.stats.cangrejos}</div>
                 <div className="text-xs text-gray-500 mt-0.5">Cangrejos</div>
               </div>
-              <div className="bg-white border border-gray-100 rounded-lg p-4">
-                <div className="text-center">
-                  <div
-                    className={`text-2xl font-bold ${
-                      resultado.stats.ots > 5 ? "text-orange-600" : "text-blue-600"
-                    }`}
-                  >
-                    {resultado.stats.ots}
-                  </div>
-                  <div className="text-xs text-gray-500 mt-0.5">
-                    {resultado.stats.ots === 1 ? "problema recurrente" : "problemas recurrentes"}
-                  </div>
-                  <div className="text-[11px] text-gray-400 mt-0.5">
-                    con más de 3 OTs · de {resultado.stats.totalTiposOts} ítems en el historial
-                  </div>
-                  {resultado.stats.autosDelGrupo > 0 && (
-                    <div className="text-[11px] text-gray-400 mt-1">
-                      {resultado.stats.otsPorAuto} OTs/vehículo · {resultado.stats.autosDelGrupo} autos
-                    </div>
-                  )}
+              <div className="bg-white border border-gray-100 rounded-lg p-4 text-center">
+                <div className="text-2xl font-bold text-blue-600">{resultado.stats.autosDelGrupo}</div>
+                <div className="text-xs text-gray-500 mt-0.5">autos del modelo</div>
+                <div className="text-[11px] text-gray-400 mt-0.5">
+                  {resultado.stats.totalTiposOts} fallas distintas · {resultado.stats.otsPorAuto} OTs/auto
                 </div>
-                {resultado.stats.otsTop10?.length > 0 && (
-                  <div className="mt-3 pt-3 border-t border-gray-100">
-                    <div className="text-[11px] text-gray-400 mb-1">
-                      Top {resultado.stats.otsTop10.length} por frecuencia:
-                    </div>
-                    <ul className="text-xs list-disc list-inside space-y-0.5">
-                      {resultado.stats.otsTop10.map(
-                        (o: { item: string; count: number; sobreUmbral: boolean }) => (
-                          <li
-                            key={o.item}
-                            className={o.sobreUmbral ? "text-blue-700 font-semibold" : "text-gray-500"}
-                          >
-                            {o.item} ({o.count})
-                          </li>
-                        )
-                      )}
-                    </ul>
-                  </div>
-                )}
               </div>
             </div>
+
+            {resultado.stats.otsTop10?.length > 0 && (
+              <div className="bg-white border border-gray-100 rounded-lg p-4 mt-3">
+                <h4 className="text-xs font-semibold text-gray-700 mb-3">
+                  Fallas más frecuentes del modelo
+                </h4>
+                <ul className="space-y-2">
+                  {resultado.stats.otsTop10.map(
+                    (o: {
+                      item: string;
+                      autos: number;
+                      count: number;
+                      pct: number | null;
+                    }) => (
+                      <li key={o.item}>
+                        <div className="flex items-baseline justify-between gap-3 text-xs">
+                          <span className="text-gray-700 truncate">{o.item}</span>
+                          <span className="shrink-0 font-semibold text-blue-700">
+                            {o.pct != null ? `${o.pct}%` : "—"}
+                            <span className="font-normal text-gray-400">
+                              {" "}
+                              ({o.autos}/{resultado.stats.autosDelGrupo})
+                            </span>
+                          </span>
+                        </div>
+                        <div className="mt-1 h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-blue-500"
+                            style={{ width: `${Math.min(o.pct ?? 0, 100)}%` }}
+                          />
+                        </div>
+                      </li>
+                    )
+                  )}
+                </ul>
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">
-            {resultado.items.map((it: { titulo: string; tag: string; criticidad: number }, i: number) => (
+            {resultado.items.map((it: { titulo: string; tag: string }, i: number) => (
               <details key={i} className="border border-gray-100 rounded-xl p-3.5 hover:border-gray-200 transition">
                 <summary className="flex items-center justify-between cursor-pointer gap-3">
                   <span className="font-medium text-sm">{it.titulo}</span>
-                  <span className="flex items-center gap-2 shrink-0">
-                    <span className="bg-gray-100 text-gray-600 text-xs rounded-full px-2.5 py-0.5">{it.tag}</span>
-                    <span
-                      className={`text-white text-xs rounded-full px-2.5 py-0.5 ${
-                        it.criticidad >= 5 ? "bg-red-600" : it.criticidad >= 4 ? "bg-red-500" : "bg-gray-400"
-                      }`}
-                    >
-                      Criticidad {it.criticidad}
-                    </span>
+                  <span className="bg-gray-100 text-gray-600 text-xs rounded-full px-2.5 py-0.5 shrink-0">
+                    {it.tag}
                   </span>
                 </summary>
               </details>
