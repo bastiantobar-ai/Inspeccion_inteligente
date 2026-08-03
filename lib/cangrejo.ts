@@ -1,128 +1,90 @@
 /**
- * Riesgo de CANGREJO — puntaje aditivo de 0 a 10.
+ * Probabilidad de CANGREJO — combinación ponderada de dos señales:
  *
- * Se descartó devolver una probabilidad absoluta (%): la tasa base
- * real ronda el 1%, así que hasta un caso de riesgo alto mostraba
- * "1,8%" y resultaba ilegible. El puntaje 0-10 es directo.
+ *   riesgo por CQI ......... 30% de peso
+ *   riesgo por tasa ......... 70% de peso
+ *   probabilidad (%) = 0,3 × riesgoCqi + 0,7 × riesgoTasa
  *
- * Criterios (suman 10 en el peor caso):
- *   Tasa de cangrejo del modelo ≥2x la base . 4 pts
- *   Año anterior a 2016 ...................... 4 pts
- *   Más de 5 problemas recurrentes ........... 2 pts
+ * Reemplaza al puntaje aditivo anterior (0-10 con año/tasa/recurrentes
+ * como criterios independientes). Ahora "año" ya no es un criterio
+ * propio: entra indirectamente vía el CQI (que lo usa como uno de
+ * sus factores), así que sumarlo aparte hubiera sido contarlo dos
+ * veces. "Problemas recurrentes" quedó fuera de este indicador —
+ * sigue visible como titular de la tarjeta de OTs, pero no entra en
+ * la probabilidad de cangrejo.
  *
- * Reparto de pesos. Con 3 criterios binarios hay 8 combinaciones,
- * así que los pesos definen toda la tabla de resultados:
+ * ── riesgoCqi (0-100) ──
+ * El CQI (lib/cqi.ts) da un puntaje 0-100 donde 100 = mejor calidad
+ * (todo A). El riesgo es lo inverso: riesgoCqi = 100 - cqi.puntaje.
  *
- *   ninguno ....................  0  POCO PROBABLE
- *   solo recurrentes ...........  2  POCO PROBABLE
- *   solo año / solo tasa .......  4  POCO PROBABLE
- *   año + recurrentes ..........  6  PROBABLE
- *   tasa + recurrentes .........  6  PROBABLE
- *   año + tasa ..................  8  MUY PROBABLE
- *   los tres ................... 10  MUY PROBABLE
+ * ── riesgoTasa (0-100) ──
+ * Viene de vecesBase = (cangrejos_mm / autos_mm) / tasa_base_global,
+ * calculado en Supabase por tasa_cangrejo_grupo. Se topa en 3x: un
+ * grupo con 3 veces la tasa base ya es el máximo riesgo posible por
+ * este componente (mismo corte que usaba el modelo estadístico
+ * anterior para "MUY ALTA"). Sin ese tope, un grupo con muy pocos
+ * autos y 1 cangrejo podría dar 20x o más y dominar el promedio.
  *
- * Ningún criterio por sí solo llega a PROBABLE: hacen falta dos
- * señales, para no alarmar por un dato aislado.
+ *   riesgoTasa = min(vecesBase, 3) / 3 × 100
  *
- * Sobre el criterio de tasa: la versión anterior comparaba el
- * CONTEO crudo de cangrejos del grupo (>2), lo que sesga a favor
- * de modelos populares — más exposición, más cangrejos en números
- * absolutos aunque la proporción sea normal. Ejemplo real: Chevrolet
- * tenía 6 cangrejos (se ve mal) pero eran 3,7% de sus autos, mejor
- * que el promedio (~1%). Opel tenía menos cangrejos en total pero
- * 27,6% de tasa. Por eso ahora se compara la TASA del grupo
- * (cangrejos_mm / autos_mm, ambos vía tasa_cangrejo_grupo en
- * Supabase) contra la tasa base global, y se exige un múltiplo
- * (veces_base >= 2) en vez de un conteo absoluto.
+ * Sin muestra confiable (autos_mm < MUESTRA_MINIMA) o sin exposición
+ * registrada, no hay forma de estimar la tasa real: se asume 1x la
+ * base (ni castiga ni premia por falta de dato), en vez de tratarlo
+ * como 0 (que bajaría el riesgo artificialmente) o dejar que un
+ * cálculo con n=1 dispare el promedio.
  *
- * Aviso de muestra chica: con pocos autos en el grupo (autos_mm
- * bajo) la tasa es ruidosa — 1 cangrejo sobre 1 auto da veces_base
- * altísimo sin ser señal real. Por eso el criterio exige también
- * un mínimo de exposición (MUESTRA_MINIMA); sin eso, no se marca
- * como cumplido aunque la tasa sea alta.
- *
- * Justificación de cada peso, medida contra la base real:
- *   · Tasa de cangrejo (4): la señal circular más fuerte, pero
- *     ahora corregida por exposición en vez de conteo crudo.
- *   · Año <2016 (4): 1,86x de lift (10,2% vs 5,5%). El mejor
- *     predictor no circular.
- *   · Recurrentes (2): el más débil, ~1,3x a nivel de grupo.
- *
- * "Problema recurrente" = work_item_name con más de 3 OTs en el
- * grupo. Es el mismo número que la tarjeta muestra como titular.
- *
- * Criterios descartados por redundancia:
- *   · CQI D/E — el CQI ya incluye el año (sin KM es la mitad del
- *     cálculo), así que se disparaba junto con "año <2016" en ~93%
- *     de los casos: eran puntos midiendo dos veces la antigüedad.
- *   · Ítems de trabajo distintos >10 — se cumplía en el 100% de los
- *     casos reales (el mínimo medido fue 64) y además crecía con el
- *     tamaño de la flota, o sea medía popularidad, no riesgo.
- *
- * Lectura:
- *   < 5   → poco probable
- *   5 a 7 → existe probabilidad
- *   >= 8  → muy probable
+ * Lectura del % final:
+ *   < 30   → poco probable
+ *   30-59  → probable
+ *   >= 60  → muy probable
  */
 
-// Umbral de "cuántas veces la base" para que la tasa cuente como señal.
-const UMBRAL_VECES_BASE = 2;
-// Exposición mínima del grupo (autos con OTs) para confiar en la tasa.
+const PESO_CQI = 0.3;
+const PESO_TASA = 0.7;
+const TOPE_VECES_BASE = 3;
 const MUESTRA_MINIMA = 5;
 
 export type NivelCangrejo = "POCO PROBABLE" | "PROBABLE" | "MUY PROBABLE";
 
-export type CriterioCangrejo = {
-  descripcion: string;
-  puntos: number;
-  cumple: boolean;
-};
-
-export type ResultadoCangrejo = {
-  puntaje: number;
-  maximo: number;
+export type ResultadoProbabilidadCangrejo = {
+  porcentaje: number;
   nivel: NivelCangrejo;
-  criterios: CriterioCangrejo[];
+  muestraSuficiente: boolean;
+  componentes: {
+    cqi: { puntaje: number; riesgo: number; pesoPct: number };
+    tasa: { vecesBaseUsado: number; riesgo: number; pesoPct: number };
+  };
 };
 
-export function calcularRiesgoCangrejo(params: {
-  anio: number;
-  problemasRecurrentes: number;
-  /** cangrejos_mm / autos_mm del grupo, dividido por la tasa base global. null si no hay exposición (autos_mm = 0). */
+export function calcularProbabilidadCangrejo(params: {
+  /** cqi.puntaje de lib/cqi.ts, 0-100 (100 = mejor calidad). */
+  cqiPuntaje: number;
+  /** veces_base de tasa_cangrejo_grupo. null si autos_mm = 0. */
   vecesBase: number | null;
-  /** autos del grupo con OTs registradas — exposición para confiar en la tasa. */
+  /** autos_mm de tasa_cangrejo_grupo — exposición del grupo. */
   autosMarcaModelo: number;
-}): ResultadoCangrejo {
-  const { anio, problemasRecurrentes, vecesBase, autosMarcaModelo } = params;
+}): ResultadoProbabilidadCangrejo {
+  const { cqiPuntaje, vecesBase, autosMarcaModelo } = params;
 
   const muestraSuficiente = autosMarcaModelo >= MUESTRA_MINIMA;
-  const tasaAlta = muestraSuficiente && vecesBase != null && vecesBase >= UMBRAL_VECES_BASE;
+  const vecesBaseUsado = muestraSuficiente && vecesBase != null ? vecesBase : 1;
 
-  const criterios: CriterioCangrejo[] = [
-    {
-      descripcion: muestraSuficiente
-        ? `Tasa de cangrejo del modelo ${vecesBase != null ? `${vecesBase}x` : "—"} la base (más de ${UMBRAL_VECES_BASE}x, sobre ${autosMarcaModelo} autos)`
-        : `Muestra insuficiente para medir tasa (${autosMarcaModelo} autos, mínimo ${MUESTRA_MINIMA})`,
-      puntos: 4,
-      cumple: tasaAlta,
-    },
-    {
-      descripcion: `Año ${anio} (anterior a 2016)`,
-      puntos: 4,
-      cumple: anio < 2016,
-    },
-    {
-      descripcion: `${problemasRecurrentes} problemas recurrentes (más de 5)`,
-      puntos: 2,
-      cumple: problemasRecurrentes > 5,
-    },
-  ];
+  const riesgoCqi = 100 - cqiPuntaje;
+  const riesgoTasa = (Math.min(vecesBaseUsado, TOPE_VECES_BASE) / TOPE_VECES_BASE) * 100;
 
-  const puntaje = criterios.reduce((acc, c) => acc + (c.cumple ? c.puntos : 0), 0);
+  const porcentaje = PESO_CQI * riesgoCqi + PESO_TASA * riesgoTasa;
 
   const nivel: NivelCangrejo =
-    puntaje >= 8 ? "MUY PROBABLE" :
-    puntaje >= 5 ? "PROBABLE" : "POCO PROBABLE";
+    porcentaje >= 60 ? "MUY PROBABLE" :
+    porcentaje >= 30 ? "PROBABLE" : "POCO PROBABLE";
 
-  return { puntaje, maximo: 10, nivel, criterios };
+  return {
+    porcentaje: Math.round(porcentaje * 10) / 10,
+    nivel,
+    muestraSuficiente,
+    componentes: {
+      cqi: { puntaje: cqiPuntaje, riesgo: Math.round(riesgoCqi * 10) / 10, pesoPct: PESO_CQI * 100 },
+      tasa: { vecesBaseUsado, riesgo: Math.round(riesgoTasa * 10) / 10, pesoPct: PESO_TASA * 100 },
+    },
+  };
 }
