@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     inspResult,
     { data: topOtsRpc, error: errOts },
     { data: resumenOtsRpc, error: errResumenOts },
-    { data: cangrejosCount, error: errCangrejos },
+    { data: tasaCangrejoRpc, error: errCangrejos },
     devsResult,
     { data: alertas },
   ] = await Promise.all([
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
       p_anio: anio,
       p_version: version ?? null,
     }),
-    supabase.rpc("contar_cangrejos_grupo", { p_marca: marca, p_modelo: modelo }),
+    supabase.rpc("tasa_cangrejo_grupo", { p_marca: marca, p_modelo: modelo }),
     tieneVersion
       ? supabase.from("devoluciones").select("descripcion").eq("aux_sku", fullAuxSku)
       : supabase.rpc("devoluciones_grupo", { p_marca: marca, p_modelo: modelo, p_anio: anioStr }),
@@ -85,9 +85,22 @@ export async function POST(req: NextRequest) {
   // Regla de negocio: "TOP 10 OTS mayor 3 OTS".
   const otsFrecuentes = todasOts.filter((o) => o.sobreUmbral);
 
-  // Number(): las RPC de conteo devuelven bigint y PostgREST puede
-  // serializarlo como string, lo que rompería las comparaciones.
-  const cangrejosDelGrupo = Number(cangrejosCount ?? 0);
+  // Number(): las RPC de conteo devuelven bigint/numeric y PostgREST
+  // puede serializarlos como string, lo que rompería las comparaciones.
+  const tasaCangrejo = (Array.isArray(tasaCangrejoRpc) ? tasaCangrejoRpc[0] : tasaCangrejoRpc) as
+    | {
+        cangrejos_mm: number;
+        autos_mm: number;
+        tasa_mm: number | null;
+        tasa_base: number;
+        veces_base: number | null;
+      }
+    | undefined;
+  const cangrejosDelGrupo = Number(tasaCangrejo?.cangrejos_mm ?? 0);
+  const autosMarcaModelo = Number(tasaCangrejo?.autos_mm ?? 0);
+  const tasaMarcaModelo = tasaCangrejo?.tasa_mm != null ? Number(tasaCangrejo.tasa_mm) : null;
+  const tasaBase = Number(tasaCangrejo?.tasa_base ?? 0);
+  const vecesBase = tasaCangrejo?.veces_base != null ? Number(tasaCangrejo.veces_base) : null;
 
   const resumenOts = (Array.isArray(resumenOtsRpc) ? resumenOtsRpc[0] : resumenOtsRpc) as
     | {
@@ -108,7 +121,8 @@ export async function POST(req: NextRequest) {
   const riesgo = calcularRiesgoCangrejo({
     anio,
     problemasRecurrentes: otsRecurrentes,
-    cangrejosMarcaModelo: cangrejosDelGrupo,
+    vecesBase,
+    autosMarcaModelo,
   });
 
   const alertaMotor = version
@@ -201,6 +215,13 @@ export async function POST(req: NextRequest) {
       nivel: riesgo.nivel,
       criterios: riesgo.criterios,
       antiguedadRiesgo: anio < 2016,
+      tasa: {
+        cangrejosMm: cangrejosDelGrupo,
+        autosMm: autosMarcaModelo,
+        tasaMm: tasaMarcaModelo,
+        tasaBase,
+        vecesBase,
+      },
     },
     alertaMotor: alertaMotor ? { motor: alertaMotor.motor, link: alertaMotor.link } : null,
     email: email ?? null,
