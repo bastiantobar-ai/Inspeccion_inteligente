@@ -203,12 +203,7 @@ export default function Home() {
 
       {resultado && !resultado.error && (
         <section className="bg-white border border-gray-100 rounded-2xl shadow-sm p-6 sm:p-8 mt-6 space-y-5">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold">📋 Checklist Generado</h2>
-            <span className="bg-gray-100 text-gray-600 text-xs rounded-full px-3 py-1">
-              {resultado.items.length} items
-            </span>
-          </div>
+          <h2 className="text-lg font-bold">📋 Análisis del Vehículo</h2>
 
           {resultado.inspeccionDiferenciada && (
             <div
@@ -287,8 +282,10 @@ export default function Home() {
                 </span>
               </div>
               <div className="text-xs text-gray-500 mt-2">
-                {resultado.cangrejo.tasa.cangrejosMm} cangrejos en {resultado.cangrejo.tasa.autosMm} autos del modelo
+                {resultado.cangrejo.tasa.cangrejosMm} cangrejos en {resultado.cangrejo.tasa.autosMm}{" "}
+                {marca} {modelo}
               </div>
+              <div className="text-[11px] text-gray-400">todos los años</div>
               <div className="text-[11px] text-gray-400 mt-1">
                 base global: {resultado.cangrejo.tasa.tasaBase}%
                 {resultado.cangrejo.tasa.vecesBase != null && ` · ${resultado.cangrejo.tasa.vecesBase}x`}
@@ -296,33 +293,34 @@ export default function Home() {
             </div>
 
             <div className="border border-gray-100 bg-gray-50/50 rounded-xl p-4">
-              <div className="text-xs text-gray-500 mb-1">Probabilidad de cangrejo</div>
+              <div className="text-xs text-gray-500 mb-1">Índice de riesgo de cangrejo</div>
               <div className="flex items-baseline gap-2">
                 <span
                   className={`text-4xl font-bold ${
-                    resultado.cangrejo.probabilidad.nivel === "MUY PROBABLE" ? "text-red-600" :
-                    resultado.cangrejo.probabilidad.nivel === "PROBABLE" ? "text-orange-600" : "text-green-600"
+                    resultado.cangrejo.riesgo.nivel === "RIESGO ALTO" ? "text-red-600" :
+                    resultado.cangrejo.riesgo.nivel === "RIESGO MEDIO" ? "text-orange-600" : "text-green-600"
                   }`}
                 >
-                  {resultado.cangrejo.probabilidad.porcentaje}%
+                  {resultado.cangrejo.riesgo.indice}
                 </span>
+                <span className="text-sm text-gray-400">/ 100</span>
               </div>
               <div className="text-xs font-medium text-gray-600 mt-1">
-                {resultado.cangrejo.probabilidad.nivel}
+                {resultado.cangrejo.riesgo.nivel}
               </div>
               <div className="mt-3 h-2 w-full rounded-full bg-gray-200 overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all ${
-                    resultado.cangrejo.probabilidad.nivel === "MUY PROBABLE" ? "bg-red-500" :
-                    resultado.cangrejo.probabilidad.nivel === "PROBABLE" ? "bg-orange-500" : "bg-green-500"
+                    resultado.cangrejo.riesgo.nivel === "RIESGO ALTO" ? "bg-red-500" :
+                    resultado.cangrejo.riesgo.nivel === "RIESGO MEDIO" ? "bg-orange-500" : "bg-green-500"
                   }`}
-                  style={{ width: `${resultado.cangrejo.probabilidad.porcentaje}%` }}
+                  style={{ width: `${resultado.cangrejo.riesgo.indice}%` }}
                 />
               </div>
               <div className="text-[11px] text-gray-400 mt-1.5">
-                menos de 30%: poco probable · 30-59%: probable · 60% o más: muy probable
+                escala relativa, no es una probabilidad · menos de 30: bajo · 30-59: medio · 60+: alto
               </div>
-              {!resultado.cangrejo.probabilidad.muestraSuficiente && (
+              {!resultado.cangrejo.riesgo.muestraSuficiente && (
                 <div className="text-[11px] text-amber-600 mt-1">
                   Muestra insuficiente del modelo: se asumió tasa promedio
                 </div>
@@ -330,25 +328,34 @@ export default function Home() {
             </div>
           </div>
 
-          {resultado.cangrejo.probabilidad.componentes && (
+          {resultado.cangrejo.riesgo.componentes && (
             <details className="border border-gray-100 rounded-xl p-4 text-sm">
-              <summary className="cursor-pointer font-medium">¿De dónde sale ese porcentaje?</summary>
+              <summary className="cursor-pointer font-medium">¿De dónde sale ese índice?</summary>
               <ul className="mt-3 space-y-1.5">
                 <li className="flex items-center justify-between text-xs text-gray-800">
-                  <span>CQI (puntaje {resultado.cangrejo.probabilidad.componentes.cqi.puntaje}/100) — riesgo {resultado.cangrejo.probabilidad.componentes.cqi.riesgo}</span>
-                  <span className="font-semibold">{resultado.cangrejo.probabilidad.componentes.cqi.pesoPct}%</span>
+                  <span>CQI (puntaje {resultado.cangrejo.riesgo.componentes.cqi.puntaje}/100) — riesgo {resultado.cangrejo.riesgo.componentes.cqi.riesgo}</span>
+                  <span className="font-semibold">{resultado.cangrejo.riesgo.componentes.cqi.pesoPct}%</span>
                 </li>
                 <li className="flex items-center justify-between text-xs text-gray-800">
-                  <span>Tasa ({resultado.cangrejo.probabilidad.componentes.tasa.vecesBaseUsado}x la base) — riesgo {resultado.cangrejo.probabilidad.componentes.tasa.riesgo}</span>
-                  <span className="font-semibold">{resultado.cangrejo.probabilidad.componentes.tasa.pesoPct}%</span>
+                  <span>
+                    Tasa ({resultado.cangrejo.riesgo.componentes.tasa.vecesBaseUsado}x la base, tope{" "}
+                    {resultado.cangrejo.riesgo.componentes.tasa.tope}x) — riesgo{" "}
+                    {resultado.cangrejo.riesgo.componentes.tasa.riesgo}
+                  </span>
+                  <span className="font-semibold">{resultado.cangrejo.riesgo.componentes.tasa.pesoPct}%</span>
                 </li>
                 <li className="flex items-center justify-between text-xs font-semibold border-t border-gray-100 pt-1.5 mt-1.5">
-                  <span>Probabilidad final</span>
-                  <span>{resultado.cangrejo.probabilidad.porcentaje}%</span>
+                  <span>Índice final</span>
+                  <span>{resultado.cangrejo.riesgo.indice} / 100</span>
                 </li>
               </ul>
-              <div className="mt-3 pt-3 border-t border-gray-100 text-[11px] text-gray-400">
-                probabilidad = 30% × riesgo por CQI + 70% × riesgo por tasa
+              <div className="mt-3 pt-3 border-t border-gray-100 text-[11px] text-gray-400 space-y-1">
+                <div>índice = 30% × riesgo por CQI + 70% × riesgo por tasa</div>
+                <div className="text-amber-600">
+                  Es una escala de riesgo relativo, no una probabilidad. La chance real de que este
+                  modelo sea cangrejo es la tasa observada:{" "}
+                  {resultado.cangrejo.tasa.tasaMm != null ? `${resultado.cangrejo.tasa.tasaMm}%` : "—"}
+                </div>
               </div>
             </details>
           )}
@@ -366,7 +373,10 @@ export default function Home() {
               </div>
               <div className="bg-white border border-gray-100 rounded-lg p-4 text-center">
                 <div className="text-2xl font-bold text-blue-600">{resultado.stats.autosDelGrupo}</div>
-                <div className="text-xs text-gray-500 mt-0.5">autos del modelo</div>
+                <div className="text-xs text-gray-500 mt-0.5">
+                  {marca} {modelo} {anio}
+                  {version ? ` ${version}` : ""}
+                </div>
                 <div className="text-[11px] text-gray-400 mt-0.5">
                   {resultado.stats.totalTiposOts} fallas distintas · {resultado.stats.otsPorAuto} OTs/auto
                 </div>
@@ -411,18 +421,6 @@ export default function Home() {
             )}
           </div>
 
-          <div className="space-y-2">
-            {resultado.items.map((it: { titulo: string; tag: string }, i: number) => (
-              <details key={i} className="border border-gray-100 rounded-xl p-3.5 hover:border-gray-200 transition">
-                <summary className="flex items-center justify-between cursor-pointer gap-3">
-                  <span className="font-medium text-sm">{it.titulo}</span>
-                  <span className="bg-gray-100 text-gray-600 text-xs rounded-full px-2.5 py-0.5 shrink-0">
-                    {it.tag}
-                  </span>
-                </summary>
-              </details>
-            ))}
-          </div>
         </section>
       )}
     </main>
