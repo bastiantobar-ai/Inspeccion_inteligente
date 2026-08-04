@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
     { data: topOtsRpc, error: errOts },
     { data: resumenOtsRpc, error: errResumenOts },
     { data: tasaCangrejoRpc, error: errCangrejos },
+    { data: maxVecesBaseRpc },
     devsResult,
     { data: alertas },
   ] = await Promise.all([
@@ -58,6 +59,12 @@ export async function POST(req: NextRequest) {
       p_version: version ?? null,
     }),
     supabase.rpc("tasa_cangrejo_grupo", { p_marca: marca, p_modelo: modelo }),
+    // Peor vecesBase real de TODA la base — no depende de marca/modelo
+    // buscado, es el techo del índice de riesgo (lib/cangrejo.ts). Sin
+    // error-check propio: si falla, calcularIndiceCangrejo cae a su
+    // resguardo interno (DEFAULT_MAX_VECES_BASE) en vez de romper el
+    // checklist por un dato que es solo de calibración.
+    supabase.rpc("max_veces_base_cangrejo"),
     tieneVersion
       ? supabase.from("devoluciones").select("descripcion").eq("aux_sku", fullAuxSku)
       : supabase.rpc("devoluciones_grupo", { p_marca: marca, p_modelo: modelo, p_anio: anioStr }),
@@ -116,6 +123,7 @@ export async function POST(req: NextRequest) {
     cqiPuntaje: cqi.puntaje,
     vecesBase,
     autosMarcaModelo,
+    maxVecesBase: maxVecesBaseRpc != null ? Number(maxVecesBaseRpc) : null,
   });
 
   const alertaMotor = version
