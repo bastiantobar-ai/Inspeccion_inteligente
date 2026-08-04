@@ -21,27 +21,38 @@
  * ── riesgoCqi (0-100) ──
  * El CQI (lib/cqi.ts) da un puntaje 0-100 donde 100 = mejor calidad
  * (todo A). El riesgo es lo inverso: riesgoCqi = 100 - cqi.puntaje.
+ * Llega a 100 con el peor CQI posible (todo E).
  *
- * ── riesgoTasa (0-100) ──
+ * ── riesgoTasa (0-100) — escala contra el PEOR CASO REAL ──
  * Viene de vecesBase = (cangrejos_mm / autos_mm) / tasa_base_global,
- * calculado en Supabase por tasa_cangrejo_grupo. Se topa en
- * TOPE_VECES_BASE para que un grupo con pocos autos y 1 cangrejo
- * (que puede dar 50x o más) no domine el promedio.
+ * calculado en Supabase por tasa_cangrejo_grupo.
  *
- *   riesgoTasa = min(vecesBase, TOPE) / TOPE × 100
+ * Historial de esta fórmula (dos versiones descartadas):
+ *   1. min(vecesBase, TOPE)/TOPE×100 con TOPE=10 inventado: un grupo
+ *      en 10x y uno en 54x daban el mismo riesgo (100) — salto
+ *      brusco e injusto, capaba antes de tiempo.
+ *   2. Curva de saturación 100×vecesBase/(vecesBase+K): sin salto,
+ *      pero asintótica — nunca llega exactamente a 100, ni con el
+ *      peor caso posible. El pedido explícito era que SÍ se pudiera
+ *      alcanzar 100 en el peor caso real.
  *
- * El tope estuvo en 3x, heredado del modelo estadístico viejo, cuando
- * la tasa base era ~6,5% (denominador = autos con OTs). Al pasar el
- * denominador a `stock` completo la base cayó a ~0,55%, así que los
- * múltiplos se estiran mucho más y 3x dejó de ser "el techo": un
- * grupo con 1,64% de tasa daba exactamente 3x y topeaba el
- * componente en 100, empujando el índice a 92,5 — absurdo para un
- * evento con 1,64% de chance real.
+ * Ahora: escala LINEAL contra maxVecesBase, que es el vecesBase del
+ * peor grupo real de la base (mayor tasa de cangrejo relativa a la
+ * base, entre marca+modelo con exposición confiable >= muestra
+ * mínima). No es un número inventado: es el techo que YA existe en
+ * la data. Por eso no hay "salto brusco antes de tiempo" (nada en
+ * la data supera ese valor, por definición) y el 100 SÍ es
+ * alcanzable — es exactamente el auto con peor CQI y la tasa de
+ * cangrejo más alta registrada.
  *
- * TOPE_VECES_BASE = 10 es un valor interino, elegido para que 3x
- * quede en 30 (riesgo moderado) y no en el máximo. NO está calibrado
- * contra la distribución real de vecesBase entre grupos; conviene
- * medir esa distribución y fijarlo en un percentil alto (p90/p95).
+ *   riesgoTasa = min(vecesBase, maxVecesBase) / maxVecesBase × 100
+ *
+ * maxVecesBase NO se hardcodea acá: lo calcula en vivo la función
+ * SQL max_veces_base_cangrejo() (ver funciones_riesgo.sql) y lo pasa
+ * route.ts como parámetro. Así, si el mes que viene un modelo nuevo
+ * empeora el peor caso, el techo se mueve solo — sin tocar código.
+ * DEFAULT_MAX_VECES_BASE es solo el resguardo si esa RPC falla o
+ * devuelve null (no hay grupos con muestra suficiente todavía).
  *
  * Sin muestra confiable (autos_mm < MUESTRA_MINIMA) o sin exposición
  * registrada, no hay forma de estimar la tasa real: se asume 1x la
@@ -53,12 +64,17 @@
  *   < 30   → riesgo bajo
  *   30-59  → riesgo medio
  *   >= 60  → riesgo alto
+ *   100    → el peor caso real: CQI todo E + la tasa de cangrejo
+ *            más alta entre todos los marca+modelo de la base.
  */
 
 const PESO_CQI = 0.3;
 const PESO_TASA = 0.7;
-const TOPE_VECES_BASE = 10;
 const MUESTRA_MINIMA = 5;
+// Resguardo si max_veces_base_cangrejo() falla o devuelve null — no
+// es el valor real, es solo para que el índice siga calculando algo
+// razonable en vez de romperse.
+const DEFAULT_MAX_VECES_BASE = 20;
 
 export type NivelCangrejo = "RIESGO BAJO" | "RIESGO MEDIO" | "RIESGO ALTO";
 
@@ -68,7 +84,7 @@ export type ResultadoIndiceCangrejo = {
   muestraSuficiente: boolean;
   componentes: {
     cqi: { puntaje: number; riesgo: number; pesoPct: number };
-    tasa: { vecesBaseUsado: number; riesgo: number; pesoPct: number; tope: number };
+    tasa: { vecesBaseUsado: number; riesgo: number; pesoPct: number; maxVecesBase: number };
   };
 };
 
@@ -79,14 +95,22 @@ export function calcularIndiceCangrejo(params: {
   vecesBase: number | null;
   /** autos_mm de tasa_cangrejo_grupo — exposición del grupo. */
   autosMarcaModelo: number;
+  /**
+   * Peor vecesBase real de toda la base, calculado en vivo por
+   * max_veces_base_cangrejo() en Supabase. null/undefined usa
+   * DEFAULT_MAX_VECES_BASE como resguardo.
+   */
+  maxVecesBase?: number | null;
 }): ResultadoIndiceCangrejo {
   const { cqiPuntaje, vecesBase, autosMarcaModelo } = params;
+  const maxVecesBase = params.maxVecesBase ?? DEFAULT_MAX_VECES_BASE;
 
   const muestraSuficiente = autosMarcaModelo >= MUESTRA_MINIMA;
   const vecesBaseUsado = muestraSuficiente && vecesBase != null ? vecesBase : 1;
 
   const riesgoCqi = 100 - cqiPuntaje;
-  const riesgoTasa = (Math.min(vecesBaseUsado, TOPE_VECES_BASE) / TOPE_VECES_BASE) * 100;
+  // Lineal contra el peor caso real — el 100 es alcanzable exactamente ahí.
+  const riesgoTasa = (Math.min(vecesBaseUsado, maxVecesBase) / maxVecesBase) * 100;
 
   const indice = PESO_CQI * riesgoCqi + PESO_TASA * riesgoTasa;
 
@@ -104,7 +128,7 @@ export function calcularIndiceCangrejo(params: {
         vecesBaseUsado,
         riesgo: Math.round(riesgoTasa * 10) / 10,
         pesoPct: PESO_TASA * 100,
-        tope: TOPE_VECES_BASE,
+        maxVecesBase,
       },
     },
   };
