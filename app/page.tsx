@@ -338,8 +338,8 @@ export default function Home() {
                 </li>
                 <li className="flex items-center justify-between text-xs text-gray-800">
                   <span>
-                    Tasa ({resultado.cangrejo.riesgo.componentes.tasa.vecesBaseUsado}x la base, tope{" "}
-                    {resultado.cangrejo.riesgo.componentes.tasa.tope}x) — riesgo{" "}
+                    Tasa ({resultado.cangrejo.riesgo.componentes.tasa.vecesBaseUsado}x la base, sobre el peor
+                    caso real de {resultado.cangrejo.riesgo.componentes.tasa.maxVecesBase}x) — riesgo{" "}
                     {resultado.cangrejo.riesgo.componentes.tasa.riesgo}
                   </span>
                   <span className="font-semibold">{resultado.cangrejo.riesgo.componentes.tasa.pesoPct}%</span>
