@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
   const anioStr = String(anio);
 
   const [
-    inspResult,
+    { data: insp, error: errInsp },
     { data: topOtsRpc, error: errOts },
     { data: resumenOtsRpc, error: errResumenOts },
     { data: tasaCangrejoRpc, error: errCangrejos },
@@ -43,9 +43,18 @@ export async function POST(req: NextRequest) {
     devsResult,
     { data: alertas },
   ] = await Promise.all([
-    tieneVersion
-      ? supabase.from("insp_dif").select("kms_inspe_plus, link").eq("aux_sku", fullAuxSku).maybeSingle()
-      : supabase.rpc("insp_dif_grupo", { p_marca: marca, p_modelo: modelo, p_anio: anioStr }).maybeSingle(),
+    // Una sola función cubre con y sin versión (ver funciones_riesgo.sql
+    // sección 0). Antes había dos caminos: exact-match .eq('aux_sku',...)
+    // con versión (frágil, el mismo problema de formato que ya rompió
+    // top_ots_grupo) y una RPC sin versión que no existía en este repo,
+    // y cuyo error nunca se chequeaba — el banner de Inspección
+    // Diferenciada podía fallar en silencio sin dejar rastro.
+    supabase.rpc("insp_dif_grupo", {
+      p_marca: marca,
+      p_modelo: modelo,
+      p_anio: anio,
+      p_version: version ?? null,
+    }).maybeSingle(),
     supabase.rpc("top_ots_grupo", {
       p_marca: marca,
       p_modelo: modelo,
@@ -71,12 +80,13 @@ export async function POST(req: NextRequest) {
     supabase.from("alertas_motor").select("*"),
   ]);
 
+  if (errInsp) return NextResponse.json({ error: errInsp.message }, { status: 500 });
   if (errOts) return NextResponse.json({ error: errOts.message }, { status: 500 });
   if (errResumenOts) return NextResponse.json({ error: errResumenOts.message }, { status: 500 });
   if (errCangrejos) return NextResponse.json({ error: errCangrejos.message }, { status: 500 });
 
-  const insp = inspResult.data as { kms_inspe_plus: number; link: string } | null;
   const devs = (devsResult.data ?? []) as { descripcion: string }[];
+  const inspDif = insp as { kms_inspe_plus: number; link: string } | null;
 
   // Top 10 fallas del modelo, ordenadas por incidencia (% de autos afectados).
   const todasOts = ((topOtsRpc ?? []) as OtRow[]).map((r) => ({
@@ -138,8 +148,12 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     auxSku: fullAuxSku ?? `${normaliza(marca)}-${normaliza(modelo)}-${anio}`,
     cqi,
-    inspeccionDiferenciada: insp
-      ? { umbralKm: insp.kms_inspe_plus, link: insp.link, superaUmbral: km != null ? km >= insp.kms_inspe_plus : null }
+    inspeccionDiferenciada: inspDif
+      ? {
+          umbralKm: inspDif.kms_inspe_plus,
+          link: inspDif.link,
+          superaUmbral: km != null ? km >= inspDif.kms_inspe_plus : null,
+        }
       : null,
     stats: {
       devoluciones: devs.length,
