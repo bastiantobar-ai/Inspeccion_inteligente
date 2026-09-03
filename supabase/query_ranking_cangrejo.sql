@@ -28,8 +28,9 @@ tasa_mm as (
 ),
 
 -- IQI por auto individual: mismos buckets que lib/iqi.ts. El grado de
--- marca sale de `iqi_marca` (letra A-E → índice 0-4). Sin fila para la
--- marca → índice 2 ('C'), mismo default que normalizaGradoMarca().
+-- marca sale de `iqi_marca_modelo` (si hay grado propio MARCA-MODELO)
+-- o de `iqi_marca` (letra A-E → índice 0-4). Sin match → índice 2
+-- ('C'), mismo default que normalizaGradoMarca() / grado_iqi_marca().
 -- puntaje = promedio de los factores con A=100 … E=20 (= 100 - idx×20),
 -- igual que la hoja. Sin KM válido se promedian 2 factores (año+marca).
 iqi_por_auto as (
@@ -49,13 +50,18 @@ iqi_por_auto as (
       else 4
     end as idx_km,
 
+    -- Cascada igual que la RPC grado_iqi_marca: primero el grado
+    -- marca-modelo (si existe), si no el de marca, si no 'C' (idx 2).
     coalesce(
-      case upper(trim(im.grado))
+      case upper(trim(coalesce(imm.grado, im.grado)))
         when 'A' then 0 when 'B' then 1 when 'C' then 2
         when 'D' then 3 when 'E' then 4 else 2
       end
     , 2) as idx_marca
   from stock s
+  left join iqi_marca_modelo imm
+    on upper(translate(trim(imm.marca_modelo), 'ÁÉÍÓÚÜáéíóúü', 'AEIOUUaeiouu'))
+     = upper(translate(trim(s.marca) || '-' || trim(s.modelo), 'ÁÉÍÓÚÜáéíóúü', 'AEIOUUaeiouu'))
   left join iqi_marca im
     on upper(translate(trim(im.marca), 'ÁÉÍÓÚÜáéíóúü', 'AEIOUUaeiouu'))
      = upper(translate(trim(s.marca),  'ÁÉÍÓÚÜáéíóúü', 'AEIOUUaeiouu'))

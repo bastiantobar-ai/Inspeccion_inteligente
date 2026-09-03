@@ -96,6 +96,17 @@ create table iqi_marca (
   grado text   -- 'A' | 'B' | 'C' | 'D' | 'E'
 );
 
+-- IQI por MARCA-MODELO (fuente: mismas hoja "IQI", columnas
+-- "Marca -Modelo" / "IQI MARCA - MODELO"). Solo las combinaciones con
+-- significancia propia. Tiene prioridad sobre iqi_marca: la RPC
+-- grado_iqi_marca(p_marca, p_modelo) usa esta si hay match, si no cae
+-- al grado de la marca, y si tampoco a 'C'.
+create table iqi_marca_modelo (
+  id           bigserial primary key,
+  marca_modelo text,   -- "KIA-MORNING", "Chevrolet-Tracker", ...
+  grado        text     -- 'A' | 'B' | 'C' | 'D' | 'E'
+);
+
 -- Inventario completo (fuente: "CL - KAOS BBDD - ERP.csv"): una fila
 -- por auto, sin importar si pasó o no por taller. Es el universo real
 -- para calcular tasas (denominador correcto de tasa_cangrejo_grupo en
@@ -137,4 +148,5 @@ create table stock (
 -- create index on stock (aux_sku);
 -- create index on stock (upper(stock_id));
 -- create index on iqi_marca (upper(translate(trim(marca), 'ÁÉÍÓÚÜáéíóúü', 'AEIOUUaeiouu')));
+-- create index on iqi_marca_modelo (upper(translate(trim(marca_modelo), 'ÁÉÍÓÚÜáéíóúü', 'AEIOUUaeiouu')));
 -- create index on devoluciones_ot (upper(aux_sku) text_pattern_ops);

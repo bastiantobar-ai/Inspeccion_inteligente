@@ -79,27 +79,42 @@ $$;
 
 
 -- ------------------------------------------------------------
--- 0c) Grado IQI de la marca — LOOKUP, no cálculo.
+-- 0c) Grado IQI de la marca (o marca-modelo) — LOOKUP, no cálculo.
 --
---     El grado A-E por marca se calcula aguas arriba y se carga en
---     la tabla `iqi_marca` desde la hoja "IQI" del ERP (se va
---     actualizando). lib/iqi.ts ya NO tiene la tabla hardcodeada:
---     route.ts trae el grado con esta función y arma el IQI con los
---     factores de año y km.
+--     El grado A-E se calcula aguas arriba en la hoja "IQI" del ERP
+--     y se carga en dos tablas: `iqi_marca` (por marca) e
+--     `iqi_marca_modelo` (solo las combinaciones con significancia
+--     propia). lib/iqi.ts NO calcula nada de marca: trae el grado con
+--     esta función y arma el IQI con los factores de año y km.
 --
---     Match case- y acento-insensible (mismo translate() que el
---     resto de las funciones acá). Si la marca NO está en la tabla
---     (ej. Alfa Romeo, Porsche) devuelve 'C' — el factor neutro —
---     en vez de NULL, para que toda marca sin clasificar entre al
---     IQI como C. lib/iqi.ts igual tiene el mismo default por si la
---     RPC falla del todo.
+--     Cascada (la primera que matchea gana):
+--       1) iqi_marca_modelo, si se pasó p_modelo y hay match para
+--          "MARCA-MODELO"  (ej. Hyundai-Accent = B aunque Hyundai = B,
+--          o Chevrolet-Tracker = C aunque Chevrolet = D)
+--       2) iqi_marca, por marca
+--       3) 'C'  — factor neutro, para marcas sin clasificar
+--          (ej. Alfa Romeo, Porsche). lib/iqi.ts tiene el mismo
+--          default por si la RPC falla del todo.
+--
+--     Todos los match son case- y acento-insensibles.
 -- ------------------------------------------------------------
 drop function if exists grado_iqi_marca(text);
+drop function if exists grado_iqi_marca(text, text);
 
-create or replace function grado_iqi_marca(p_marca text)
+create or replace function grado_iqi_marca(p_marca text, p_modelo text default null)
 returns text
 language sql stable as $$
   select coalesce(
+    -- 1) grado específico marca-modelo
+    (
+      select imm.grado
+      from iqi_marca_modelo imm
+      where p_modelo is not null and trim(p_modelo) <> ''
+        and upper(translate(trim(imm.marca_modelo), 'ÁÉÍÓÚÜáéíóúü', 'AEIOUUaeiouu'))
+          = upper(translate(trim(p_marca) || '-' || trim(p_modelo), 'ÁÉÍÓÚÜáéíóúü', 'AEIOUUaeiouu'))
+      limit 1
+    ),
+    -- 2) grado de la marca
     (
       select im.grado
       from iqi_marca im
@@ -107,6 +122,7 @@ language sql stable as $$
           = upper(translate(trim(p_marca), 'ÁÉÍÓÚÜáéíóúü', 'AEIOUUaeiouu'))
       limit 1
     ),
+    -- 3) fallback
     'C'
   );
 $$;
@@ -217,6 +233,10 @@ language sql stable as $$
            count(*)::bigint as ots
     from ots o
     where coalesce(trim(o.work_item_name), '') <> ''
+      -- 'DEVOLUCION' es un work_item_name de `ots`, pero NO es una
+      -- falla: tiene su propio histórico (devoluciones_grupo). Contarlo
+      -- acá sería doble conteo.
+      and upper(trim(o.work_item_name)) <> 'DEVOLUCION'
       and upper(o.aux_sku) like upper(trim(p_marca) || '-' || trim(p_modelo) || '-%')
     group by o.work_item_name
   )
@@ -270,6 +290,9 @@ language sql stable as $$
     select o.work_item_name as item, o.stock_id
     from ots o
     where coalesce(trim(o.work_item_name), '') <> ''
+      -- Se excluye 'DEVOLUCION' — no es una falla, va por su propio
+      -- canal (devoluciones_grupo). Mismo criterio que top_ots_grupo.
+      and upper(trim(o.work_item_name)) <> 'DEVOLUCION'
       and upper(o.aux_sku) like upper(trim(p_marca) || '-' || trim(p_modelo) || '-%')
   ),
   conteo as (
@@ -365,6 +388,102 @@ drop function if exists indice_cangrejo(text, text, int);
 
 
 -- ------------------------------------------------------------
+-- 2a) Tasa de cangrejo de la MARCA + score normalizado 0-1.
+--
+--     Para cada marca: tasa_mm = cangrejos / autos (todos sus
+--     modelos). Esa tasa se normaliza dividiéndola por la tasa de la
+--     marca PEOR (la más alta) entre las marcas con muestra
+--     suficiente:
+--
+--       score = tasa_mm(marca) / max(tasa_mm)      ∈ [0, 1]
+--
+--     → la marca peor da score 1; las poco significativas, cerca de 0.
+--
+--     p_muestra_minima (default 5): piso de autos para que una marca
+--     entre al cálculo del máximo. Sin esto, una marca con 1 auto y 1
+--     cangrejo (tasa 100%) se volvería el techo y aplastaría a todas.
+--     La marca consultada igual se devuelve aunque tenga menos autos;
+--     su score se capa a 1.
+--
+--     Claves de marca: acento- y case-insensible. `stock.marca`
+--     directo; en `cangrejos` (sin columna marca) se usa el prefijo
+--     del aux_sku (MARCA-...).
+-- ------------------------------------------------------------
+drop function if exists tasa_cangrejo_marca(text);
+drop function if exists tasa_cangrejo_marca(text, int);
+
+create or replace function tasa_cangrejo_marca(
+  p_marca          text,
+  p_muestra_minima int default 5
+)
+returns table(
+  cangrejos_mm bigint,
+  autos_mm     bigint,
+  tasa_mm      numeric,   -- %
+  tasa_base    numeric,   -- %
+  veces_base   numeric,
+  score        numeric,   -- 0..1 = tasa_mm / peor tasa_mm entre marcas
+  tasa_max_mm  numeric    -- % de la marca peor (denominador del score)
+)
+language sql stable as $$
+  with
+  base as (
+    select
+      (select count(*) from cangrejos)::numeric as c,
+      (select count(distinct stock_id) from stock)::numeric as e
+  ),
+  autos_marca as (
+    select
+      upper(translate(trim(s.marca), 'ÁÉÍÓÚÜáéíóúü', 'AEIOUUaeiouu')) as k,
+      count(distinct s.stock_id)::numeric as autos
+    from stock s
+    where coalesce(trim(s.marca), '') <> ''
+    group by 1
+  ),
+  cang_marca as (
+    select
+      split_part(
+        upper(translate(trim(g.aux_sku), 'ÁÉÍÓÚÜáéíóúü', 'AEIOUUaeiouu')), '-', 1
+      ) as k,
+      count(*)::numeric as cang
+    from cangrejos g
+    group by 1
+  ),
+  tasas as (
+    select
+      a.k,
+      a.autos,
+      coalesce(c.cang, 0) as cang,
+      case when a.autos > 0 then coalesce(c.cang, 0) / a.autos else 0 end as tasa
+    from autos_marca a
+    left join cang_marca c on c.k = a.k
+  ),
+  maxt as (
+    select max(tasa) as tasa_max
+    from tasas
+    where autos >= p_muestra_minima
+  ),
+  g as (
+    select
+      coalesce(max(autos), 0) as autos,
+      coalesce(max(cang), 0)  as cang,
+      coalesce(max(tasa), 0)  as tasa
+    from tasas
+    where k = upper(translate(trim(p_marca), 'ÁÉÍÓÚÜáéíóúü', 'AEIOUUaeiouu'))
+  )
+  select
+    g.cang::bigint,
+    g.autos::bigint,
+    round(100.0 * g.tasa, 2),
+    round(100.0 * b.c / nullif(b.e, 0), 2),
+    round(g.tasa / nullif(b.c / nullif(b.e, 0), 0), 2),
+    round(least(g.tasa / nullif(m.tasa_max, 0), 1.0), 3),
+    round(100.0 * m.tasa_max, 2)
+  from g, base b, maxt m;
+$$;
+
+
+-- ------------------------------------------------------------
 -- 2b) Peor caso real de vecesBase — el techo del índice de riesgo.
 --
 --     lib/cangrejo.ts escala riesgoTasa contra el vecesBase más
@@ -426,11 +545,13 @@ create index if not exists stock_aux_sku_prefix_idx
   on stock (upper(aux_sku) text_pattern_ops);
 create index if not exists iqi_marca_norm_idx
   on iqi_marca (upper(translate(trim(marca), 'ÁÉÍÓÚÜáéíóúü', 'AEIOUUaeiouu')));
+create index if not exists iqi_marca_modelo_norm_idx
+  on iqi_marca_modelo (upper(translate(trim(marca_modelo), 'ÁÉÍÓÚÜáéíóúü', 'AEIOUUaeiouu')));
 create index if not exists devoluciones_ot_aux_sku_prefix_idx
   on devoluciones_ot (upper(aux_sku) text_pattern_ops);
 
 -- Refresca el caché de PostgREST: sin esto, las funciones nuevas o con
--- firma cambiada (grado_iqi_marca, devoluciones_grupo, top_ots_grupo y
--- resumen_ots_grupo ahora con 2 args) pueden no aparecer de inmediato
--- para la API — el clásico "Could not find the function".
+-- firma cambiada (grado_iqi_marca, devoluciones_grupo, tasa_cangrejo_marca,
+-- top_ots_grupo y resumen_ots_grupo ahora con 2 args) pueden no aparecer
+-- de inmediato para la API — el clásico "Could not find the function".
 notify pgrst, 'reload schema';
