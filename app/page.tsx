@@ -69,31 +69,34 @@ const IcoExternal = (p: SVGProps<SVGSVGElement>) => (
 );
 const IcoCrab = (p: SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="none" {...p}>
-    <path
-      d="M6 13.6c0-2.9 2.7-4.6 6-4.6s6 1.7 6 4.6c0 2.5-2.7 3.9-6 3.9s-6-1.4-6-3.9Z"
-      fill="currentColor"
-    />
-    <circle cx="9.5" cy="8.2" r="1.15" fill="currentColor" />
-    <circle cx="14.5" cy="8.2" r="1.15" fill="currentColor" />
-    <path
-      d="M9.5 9.3v1M14.5 9.3v1"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-    />
-    <path
-      d="M6.4 12.7C3.8 12.1 2.6 9.7 4 7.8c-.9 1.1-.7 2.6.8 3M17.6 12.7c2.6-.6 3.8-3 2.4-4.9.9 1.1.7 2.6-.8 3"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M7.6 15.7 5.2 17.7M9 16.8 7.1 19M16.4 15.7 18.8 17.7M15 16.8 16.9 19"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-    />
+    {/* cangrejo (encogido para dejar aire al anillo) */}
+    <g transform="translate(12 12) scale(0.74) translate(-12 -12)">
+      <path
+        d="M6 13.6c0-2.9 2.7-4.6 6-4.6s6 1.7 6 4.6c0 2.5-2.7 3.9-6 3.9s-6-1.4-6-3.9Z"
+        fill="currentColor"
+      />
+      <circle cx="9.5" cy="8.2" r="1.15" fill="currentColor" />
+      <circle cx="14.5" cy="8.2" r="1.15" fill="currentColor" />
+      <path d="M9.5 9.3v1M14.5 9.3v1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <path
+        d="M6.4 12.7C3.8 12.1 2.6 9.7 4 7.8c-.9 1.1-.7 2.6.8 3M17.6 12.7c2.6-.6 3.8-3 2.4-4.9.9 1.1.7 2.6-.8 3"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M7.6 15.7 5.2 17.7M9 16.8 7.1 19M16.4 15.7 18.8 17.7M15 16.8 16.9 19"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </g>
+    {/* anillo de "prohibido" */}
+    <circle cx="12" cy="12" r="10.2" stroke="currentColor" strokeWidth="1.8" />
+    {/* barra diagonal: azul (corta el cangrejo) + filo blanco encima */}
+    <path d="M4.8 4.8 19.2 19.2" stroke="#2563eb" strokeWidth="3.6" strokeLinecap="round" />
+    <path d="M4.8 4.8 19.2 19.2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
   </svg>
 );
 
@@ -207,7 +210,7 @@ export default function Home() {
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-2.5">
             <span className="grid h-7 w-7 place-items-center rounded-lg bg-blue-600 text-white">
-              <IcoCrab className="h-[17px] w-[17px]" />
+              <IcoCrab className="h-[19px] w-[19px]" />
             </span>
             <span className="font-display text-[18px] font-semibold tracking-[0.03em]">
               <span className="text-blue-600">K</span>
