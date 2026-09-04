@@ -484,7 +484,7 @@ export default function Home() {
                         onClick={() => setTabProtocolo(t)}
                         className={`-mb-px border-b-2 px-5 py-3 text-[13px] font-medium transition ${
                           activo
-                            ? "border-ink text-ink"
+                            ? "border-neutral-900 text-neutral-900"
                             : "border-transparent text-ink-3 hover:text-ink-2"
                         }`}
                       >
@@ -496,7 +496,7 @@ export default function Home() {
 
                 {tabProtocolo === "normal" ? (
                   <>
-                    <div className="bg-ink px-5 py-4 text-white">
+                    <div className="bg-neutral-900 px-5 py-4 text-white">
                       <div className="text-[10.5px] font-semibold uppercase tracking-[0.09em] text-white/50">
                         Protocolo de inspección · IQI {protocolo.grado}
                       </div>
@@ -534,7 +534,7 @@ export default function Home() {
                     <ol className="divide-y divide-line">
                       {protocolo.etapas.map((e) => (
                         <li key={e.n} className="flex gap-3.5 px-5 py-4">
-                          <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-ink font-display text-[11px] font-semibold tabular-nums text-white">
+                          <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-neutral-900 font-display text-[11px] font-semibold tabular-nums text-white">
                             {e.n}
                           </span>
                           <div className="min-w-0 flex-1">
@@ -551,7 +551,7 @@ export default function Home() {
                   </>
                 ) : (
                   <>
-                    <div className="bg-ink px-5 py-4 text-white">
+                    <div className="bg-neutral-900 px-5 py-4 text-white">
                       <div className="text-[10.5px] font-semibold uppercase tracking-[0.09em] text-white/50">
                         Protocolo híbrido / eléctrico · fijo (no depende del IQI)
                       </div>
@@ -571,7 +571,7 @@ export default function Home() {
                     <ol className="divide-y divide-line">
                       {PROTOCOLO_HIBRIDO.etapas.map((e) => (
                         <li key={e.n} className="flex gap-3.5 px-5 py-4">
-                          <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-ink font-display text-[11px] font-semibold tabular-nums text-white">
+                          <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-neutral-900 font-display text-[11px] font-semibold tabular-nums text-white">
                             {e.n}
                           </span>
                           <div className="min-w-0 flex-1">
