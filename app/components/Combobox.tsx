@@ -1,0 +1,204 @@
+"use client";
+
+/**
+ * Combobox: input con autocompletado y lista desplegable propia.
+ *
+ * Reemplaza al <datalist> nativo, cuyo desplegable lo dibuja el
+ * navegador y no admite estilos (ni scroll propio, ni resaltado,
+ * ni estado vacío).
+ *
+ * A diferencia del <input list>, acá onChange se dispara solo al
+ * elegir una opción válida — no en cada tecla. Eso evita disparar
+ * la cascada de fetch (marca → modelo → versión → año) con valores
+ * a medio escribir.
+ */
+
+import { useEffect, useRef, useState, type ReactNode } from "react";
+
+type Props = {
+  label: ReactNode;
+  value: string;
+  options: string[];
+  onChange: (v: string) => void;
+  onFocus?: () => void;
+  disabled?: boolean;
+  placeholder?: string;
+  /** Control opcional a la derecha del label (no empuja el input). */
+  accion?: ReactNode;
+};
+
+export default function Combobox({
+  label,
+  value,
+  options,
+  onChange,
+  onFocus,
+  disabled = false,
+  placeholder = "Escribe o selecciona...",
+  accion,
+}: Props) {
+  const [abierto, setAbierto] = useState(false);
+  const [texto, setTexto] = useState(value);
+  const [tecleando, setTecleando] = useState(false);
+  const [resaltado, setResaltado] = useState(0);
+  const cajaRef = useRef<HTMLDivElement | null>(null);
+  const listaRef = useRef<HTMLUListElement | null>(null);
+
+  useEffect(() => { setTexto(value); }, [value]);
+
+  // Mientras no se teclee se muestra la lista completa; al teclear, filtra.
+  const filtradas = tecleando
+    ? options.filter((o) => o.toLowerCase().includes(texto.trim().toLowerCase()))
+    : options;
+
+  function cerrarYResolver() {
+    // Si lo tecleado calza exacto con una opción se acepta igual,
+    // aunque no se haya hecho click en la lista. Si no, se revierte.
+    const exacta = options.find((o) => o.toLowerCase() === texto.trim().toLowerCase());
+    if (exacta) {
+      if (exacta !== value) onChange(exacta);
+      setTexto(exacta);
+    } else {
+      setTexto(value);
+    }
+    setAbierto(false);
+    setTecleando(false);
+  }
+
+  // Cerrar al hacer click fuera. Se usa mousedown (no onBlur) porque
+  // onBlur dispara antes del click y se comería la selección.
+  useEffect(() => {
+    if (!abierto) return;
+    function onDocMouseDown(e: MouseEvent) {
+      if (cajaRef.current && !cajaRef.current.contains(e.target as Node)) cerrarYResolver();
+    }
+    document.addEventListener("mousedown", onDocMouseDown);
+    return () => document.removeEventListener("mousedown", onDocMouseDown);
+  });
+
+  // Mantener visible la opción resaltada al navegar con flechas.
+  useEffect(() => {
+    if (!abierto || !listaRef.current) return;
+    // .item() devuelve Element | null (indexar devuelve Element a secas,
+    // y afirmarlo como HTMLElement | undefined no compila).
+    listaRef.current.children.item(resaltado)?.scrollIntoView({ block: "nearest" });
+  }, [resaltado, abierto]);
+
+  function elegir(v: string) {
+    onChange(v);
+    setTexto(v);
+    setAbierto(false);
+    setTecleando(false);
+  }
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (disabled) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (!abierto) { setAbierto(true); setResaltado(0); return; }
+      setResaltado((r) => Math.min(r + 1, filtradas.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setResaltado((r) => Math.max(r - 1, 0));
+    } else if (e.key === "Enter") {
+      const op = filtradas[resaltado];
+      if (abierto && op) { e.preventDefault(); elegir(op); }
+    } else if (e.key === "Escape") {
+      setTexto(value);
+      setAbierto(false);
+      setTecleando(false);
+    }
+  }
+
+  return (
+    <div ref={cajaRef} className="relative">
+      {/* min-h fija la altura de la fila del label para que los inputs
+          queden alineados entre sí, tengan accion o no. */}
+      <div className="flex min-h-[1.25rem] items-center justify-between gap-2 mb-1.5">
+        <label className="block text-[13px] font-medium text-ink-2">{label}</label>
+        {accion}
+      </div>
+
+      <div className="relative">
+        <input
+          type="text"
+          role="combobox"
+          aria-expanded={abierto}
+          autoComplete="off"
+          className={
+            "w-full rounded-lg border bg-white px-3 py-2.5 pr-9 text-sm text-ink shadow-sm transition " +
+            "placeholder:text-ink-3 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 " +
+            "disabled:bg-paper disabled:text-ink-3 disabled:cursor-not-allowed " +
+            (abierto ? "border-blue-500" : "border-line")
+          }
+          value={texto}
+          disabled={disabled}
+          placeholder={placeholder}
+          onFocus={() => {
+            if (disabled) return;
+            setAbierto(true);
+            setTecleando(false);
+            setResaltado(0);
+            onFocus?.();
+          }}
+          onChange={(e) => {
+            setTexto(e.target.value);
+            setTecleando(true);
+            setAbierto(true);
+            setResaltado(0);
+          }}
+          onKeyDown={onKeyDown}
+        />
+        <svg
+          className={
+            "pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 transition-transform " +
+            (disabled ? "text-line " : "text-ink-3 ") +
+            (abierto ? "rotate-180" : "")
+          }
+          viewBox="0 0 20 20"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.75"
+        >
+          <path d="M6 8l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </div>
+
+      {abierto && !disabled && (
+        <ul
+          ref={listaRef}
+          role="listbox"
+          className="absolute z-30 mt-1.5 max-h-60 w-full overflow-auto rounded-xl border border-line bg-white py-1 shadow-lg shadow-ink/10"
+        >
+          {filtradas.length === 0 && (
+            <li className="px-3 py-2.5 text-sm text-ink-3">Sin resultados</li>
+          )}
+          {filtradas.map((op, i) => {
+            const esValor = op === value;
+            return (
+              <li
+                key={op}
+                role="option"
+                aria-selected={esValor}
+                onMouseEnter={() => setResaltado(i)}
+                onClick={() => elegir(op)}
+                className={
+                  "flex cursor-pointer items-center justify-between px-3 py-2 text-sm transition-colors " +
+                  (i === resaltado ? "bg-blue-50 " : "") +
+                  (esValor ? "font-medium text-blue-700" : "text-ink-2")
+                }
+              >
+                <span className="truncate">{op}</span>
+                {esValor && (
+                  <svg className="ml-2 h-3.5 w-3.5 shrink-0 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="m5 13 4 4L19 7" />
+                  </svg>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
