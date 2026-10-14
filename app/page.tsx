@@ -2,7 +2,7 @@
 
 import { useState, type SVGProps } from "react";
 import Combobox from "./components/Combobox";
-import { protocoloPorIqi, totalItems, PROTOCOLO_HIBRIDO } from "@/lib/protocolos";
+import { protocoloPorIqi, PROTOCOLO_HIBRIDO } from "@/lib/protocolos";
 import { fallasPorMarca } from "@/lib/fallas_marca";
 
 type Opciones = { marca: string[]; modelo: string[]; version: string[]; anio: string[] };
@@ -515,39 +515,30 @@ export default function Home() {
                         </div>
                       </div>
                       <div className="px-3 py-3">
-                        <div className={MINI_LABEL}>Puntos de control</div>
+                        <div className={MINI_LABEL}>Etapas</div>
                         <div className="mt-0.5 font-display text-[15px] font-semibold tabular-nums text-ink">
-                          {totalItems(protocolo)}
+                          {protocolo.etapas.length}
                         </div>
                       </div>
                     </div>
 
-                    <div className="divide-y divide-line">
-                      {protocolo.grupos.map((grp) => (
-                        <div key={grp.grupo}>
-                          <div className="bg-paper px-5 py-2 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-ink-3">
-                            {grp.grupo}
+                    <ol className="divide-y divide-line">
+                      {protocolo.etapas.map((e) => (
+                        <li key={e.n} className="flex gap-3.5 px-5 py-4">
+                          <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-neutral-900 font-display text-[11px] font-semibold tabular-nums text-white">
+                            {e.n}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="font-display text-[13.5px] font-semibold text-ink">{e.etapa}</div>
+                            <div className="mt-0.5 text-[13px] leading-relaxed text-ink-2">{e.secuencia}</div>
+                            <div className="mt-2 grid gap-x-4 gap-y-1 text-[11.5px] text-ink-3 sm:grid-cols-2">
+                              <div><span className="font-medium text-ink-2">Evidencia: </span>{e.evidencia}</div>
+                              <div><span className="font-medium text-ink-2">Escalamiento: </span>{e.escalamiento}</div>
+                            </div>
                           </div>
-                          <ol className="divide-y divide-line">
-                            {grp.items.map((it) => (
-                              <li key={it.n} className="flex gap-3.5 px-5 py-4">
-                                <span className="mt-0.5 grid h-6 w-9 shrink-0 place-items-center rounded-full bg-neutral-900 font-display text-[11px] font-semibold tabular-nums text-white">
-                                  {it.n}
-                                </span>
-                                <div className="min-w-0 flex-1">
-                                  <div className="font-display text-[13.5px] font-semibold text-ink">{it.queRevisar}</div>
-                                  <div className="mt-0.5 text-[13px] leading-relaxed text-ink-2">{it.controlCompleto}</div>
-                                  <div className="mt-2 grid gap-x-4 gap-y-1 text-[11.5px] text-ink-3 sm:grid-cols-2">
-                                    <div><span className="font-medium text-ink-2">Evidencia: </span>{it.evidencia}</div>
-                                    <div><span className="font-medium text-ink-2">Escalamiento: </span>{it.escalamiento}</div>
-                                  </div>
-                                </div>
-                              </li>
-                            ))}
-                          </ol>
-                        </div>
+                        </li>
                       ))}
-                    </div>
+                    </ol>
                   </>
                 ) : (
                   <>
