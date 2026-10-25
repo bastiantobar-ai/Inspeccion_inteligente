@@ -224,6 +224,13 @@ export default function Home() {
     };
   }, [enCurso, resultado?.consultaId]);
 
+  // El aviso "Inspección finalizada" se retira solo a los 8 s.
+  useEffect(() => {
+    if (!finalizadaEn) return;
+    const t = setTimeout(() => setFinalizadaEn(null), 8000);
+    return () => clearTimeout(t);
+  }, [finalizadaEn]);
+
   // Escape cierra el pop-up de confirmación.
   useEffect(() => {
     if (!confirmandoFin) return;
@@ -311,6 +318,13 @@ export default function Home() {
     if (hora) {
       abiertaId.current = null;
       setFinalizadaEn(hora);
+      // Deja listo el formulario para el siguiente vehículo; correo y site se mantienen.
+      setMarca(""); setModelo(""); setVersion(""); setAnio(""); setKm(""); setPatente("");
+      setSinVersion(false);
+      setOpciones((o) => ({ ...o, modelo: [], version: [], anio: [] }));
+      setResultado(null);
+      setTabProtocolo("normal");
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } else {
       setErrorFin("No se pudo guardar. Intenta de nuevo.");
     }
@@ -365,6 +379,16 @@ export default function Home() {
                 {cerrandoPendientes ? "Cerrando…" : "Sí"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {finalizadaEn && (
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white/95 shadow-[0_-4px_16px_rgba(13,15,18,0.08)] backdrop-blur">
+          <div className="mx-auto flex max-w-5xl items-center gap-2 px-4 py-4 text-sm text-ink-2 sm:px-6">
+            <span className="h-2.5 w-2.5 rounded-full bg-green-500" />
+            <span className="font-semibold text-ink">Inspección finalizada</span>
+            <span className="text-ink-3">· {finalizadaEn}</span>
           </div>
         </div>
       )}
@@ -757,15 +781,7 @@ export default function Home() {
             {resultado.consultaId && (
               <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white/95 shadow-[0_-4px_16px_rgba(13,15,18,0.08)] backdrop-blur">
                 <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-                  {finalizadaEn ? (
-                    <div className="flex items-center gap-2 text-sm text-ink-2">
-                      <span className="h-2.5 w-2.5 rounded-full bg-green-500" />
-                      <span className="font-semibold text-ink">Inspección finalizada</span>
-                      <span className="text-ink-3">
-                        · {finalizadaEn}
-                      </span>
-                    </div>
-                  ) : (
+                  {(
                     <>
                       <div className="flex items-center gap-2.5 text-sm text-ink-2">
                         <span className="relative flex h-2.5 w-2.5 shrink-0">
