@@ -110,6 +110,8 @@ async function fetchOpciones(params: Record<string, string>) {
   return (json.valores ?? []) as string[];
 }
 
+const SESION_KEY = "kriterio.sesion";
+
 export default function Home() {
   const [marca, setMarca] = useState("");
   const [modelo, setModelo] = useState("");
@@ -203,10 +205,62 @@ export default function Home() {
 
   const enCurso = !!resultado?.consultaId && !finalizadaEn;
 
-  // Al entrar: ¿quedó alguna inspección abierta de una visita anterior?
+  // El celular descarta la pestaña al salir a otra página o app y la recarga desde cero.
+  // Por eso el formulario y el resultado se guardan en sessionStorage (sobrevive a recargas
+  // y descartes de ESTA pestaña, sin mezclarse con otras) y se restauran al volver.
+  const [restaurado, setRestaurado] = useState(false);
+
   useEffect(() => {
-    setPendientes(abandonadas());
+    let idRestaurado: number | null = null;
+    try {
+      const raw = sessionStorage.getItem(SESION_KEY);
+      if (raw) {
+        const s = JSON.parse(raw);
+        setMarca(s.marca ?? ""); setModelo(s.modelo ?? ""); setVersion(s.version ?? "");
+        setAnio(s.anio ?? ""); setKm(s.km ?? ""); setEmail(s.email ?? "");
+        setSite(s.site ?? ""); setPatente(s.patente ?? ""); setSinVersion(!!s.sinVersion);
+        setTabProtocolo(s.tabProtocolo === "hibrido" ? "hibrido" : "normal");
+        if (s.resultado && !s.resultado.error) {
+          setResultado(s.resultado);
+          if (s.resultado.consultaId) {
+            idRestaurado = s.resultado.consultaId as number;
+            abiertaId.current = idRestaurado;
+            marcarEnCurso(idRestaurado);
+          }
+        }
+        if (s.marca) {
+          const cond = { marca: s.marca as string, modelo: s.modelo as string, version: s.version as string };
+          Promise.all([
+            fetchOpciones({}),
+            fetchOpciones({ marca: cond.marca }),
+            cond.modelo ? fetchOpciones({ marca: cond.marca, modelo: cond.modelo }) : Promise.resolve([]),
+            cond.modelo && s.sinVersion
+              ? fetchOpciones({ marca: cond.marca, modelo: cond.modelo, skipVersion: "true" })
+              : cond.modelo && cond.version
+              ? fetchOpciones(cond)
+              : Promise.resolve([]),
+          ])
+            .then(([m, mo, v, a]) => setOpciones({ marca: m, modelo: mo, version: v, anio: a }))
+            .catch(() => {});
+        }
+      }
+    } catch {}
+    // Inspecciones abiertas de visitas anteriores (menos la que se acaba de restaurar).
+    setPendientes(abandonadas().filter((id) => id !== idRestaurado));
+    setRestaurado(true);
   }, []);
+
+  useEffect(() => {
+    if (!restaurado) return;
+    try {
+      sessionStorage.setItem(
+        SESION_KEY,
+        JSON.stringify({
+          marca, modelo, version, anio, km, email, site, patente, sinVersion, tabProtocolo, resultado,
+        })
+      );
+    } catch {}
+  }, [restaurado, marca, modelo, version, anio, km, email, site, patente, sinVersion, tabProtocolo, resultado]);
 
   // Mientras hay una inspección en curso: latido (para que otras pestañas no
   // la tomen por abandonada) y aviso del navegador al cerrar/recargar.
