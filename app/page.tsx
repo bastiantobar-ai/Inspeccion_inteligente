@@ -575,7 +575,7 @@ export default function Home() {
           </button>
         </div>
 
-        {pendiente && pendiente.id !== resultado?.consultaId && (
+        {pendiente && (
           <section className="rounded-xl border border-blue-200 bg-blue-50 p-4 sm:p-5">
             <div className="text-[11px] font-semibold uppercase tracking-[0.09em] text-blue-700">
               Mi inspección pendiente
