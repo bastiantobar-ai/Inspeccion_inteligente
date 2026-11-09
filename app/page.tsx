@@ -111,6 +111,9 @@ async function fetchOpciones(params: Record<string, string>) {
 
 const SESION_KEY = "kriterio.sesion";
 
+// Marca/modelo escritos a mano (cuando no están en el catálogo): entre 2 y 40 caracteres.
+const textoLibreValido = (t: string) => t.trim().length >= 2 && t.trim().length <= 40;
+
 type Pendiente = {
   id: number;
   marca: string;
@@ -622,6 +625,8 @@ export default function Home() {
               options={opciones.marca}
               onFocus={onMarcaFocus}
               onChange={onChangeMarca}
+              permitirLibre
+              validarLibre={textoLibreValido}
             />
 
             <Combobox
@@ -630,6 +635,8 @@ export default function Home() {
               options={opciones.modelo}
               disabled={!marca}
               onChange={onChangeModelo}
+              permitirLibre
+              validarLibre={textoLibreValido}
             />
 
             <Combobox
